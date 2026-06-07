@@ -54,7 +54,8 @@ def _build_pipeline(mode: IngestMode) -> IngestionPipeline:
         decode_responses=True,
     )
     os_client = OpenSearch(
-        [{"host": settings.opensearch_host, "port": settings.opensearch_port}]
+        [{"host": settings.opensearch_host, "port": settings.opensearch_port}],
+        maxsize=10,
     )
     extractor = HybridEntityExtractor(use_gliner=True)
     enricher  = EntityEnricher(redis, extractor)
@@ -126,8 +127,8 @@ async def run() -> None:
 
     from apps.worker.profile_builder import ProfileBuilder
     builder = ProfileBuilder(
-        Redis(host=settings.redis_host, port=settings.redis_port, decode_responses=True),
-        OpenSearch([{"host": settings.opensearch_host, "port": settings.opensearch_port}]),
+        Redis(host=settings.redis_host, port=settings.redis_port, decode_responses=True, max_connections=20),
+        OpenSearch([{"host": settings.opensearch_host, "port": settings.opensearch_port}], maxsize=10),
     )
     print("Building entity and exposure profiles…")
     await builder.run()

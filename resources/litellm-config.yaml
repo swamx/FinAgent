@@ -1,6 +1,14 @@
 model_list:
 
-  # PRIMARY: Qwen3-8B — dense 8B, fits fully in 8 GB VRAM, Apache 2.0
+  # PRIMARY: Qwen3-30B-A3B — MoE 30B (3B active params), Apache 2.0
+  - model_name: qwen3-30b-a3b
+    litellm_params:
+      model: ollama/qwen3:30b-a3b
+      api_base: http://ollama:11434
+      extra_body:
+        think: false
+
+  # Qwen3-8B — dense 8B, fits fully in 8 GB VRAM, Apache 2.0
   - model_name: qwen3-8b
     litellm_params:
       model: ollama/qwen3:8b
@@ -23,14 +31,12 @@ model_list:
       api_base: http://ollama:11434
 
 
-# ==========================================================================
 # PAID / CLOUD — Anthropic (uncomment when ANTHROPIC_API_KEY is set)
-# ==========================================================================
 
-  # - model_name: claude-haiku
-  #   litellm_params:
-  #     model: anthropic/claude-haiku-4-5-20251001
-  #     api_key: os.environ/ANTHROPIC_API_KEY
+  - model_name: claude-haiku
+    litellm_params:
+      model: anthropic/claude-haiku-4-5-20251001
+      api_key: os.environ/ANTHROPIC_API_KEY
 
   # - model_name: claude-sonnet
   #   litellm_params:
@@ -38,22 +44,38 @@ model_list:
   #     api_key: os.environ/ANTHROPIC_API_KEY
 
 
-# ==========================================================================
 # ROUTER
-# ==========================================================================
 router_settings:
   fallbacks:
+    - qwen3-30b-a3b:
+        - qwen3-8b
+        - qwen3-4b
     - qwen3-8b:
         - qwen3-4b
 
 
-# ==========================================================================
 # GLOBAL
-# ==========================================================================
 litellm_settings:
   drop_params: true
   success_callback: ["otel"]
   failure_callback: ["otel"]
+
+
+# GUARDRAILS — top-level key (not nested under litellm_settings)
+# default_on: true enforces on every request; callers cannot opt out.
+guardrails:
+  - guardrail_name: "finagent-input-safety"
+    litellm_params:
+      guardrail: guardrails.content_safety.ContentSafetyGuardrail
+      mode: "pre_call"
+      default_on: true
+
+  - guardrail_name: "finagent-output-safety"
+    litellm_params:
+      guardrail: guardrails.content_safety.ContentSafetyGuardrail
+      mode: "post_call"
+      default_on: true
+
 
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY

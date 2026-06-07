@@ -33,7 +33,7 @@ openai>=1.59.0
 
 # Agent framework (replaces LangChain / LangGraph)
 # 0.0.15 had a griffe import bug (_griffe removed in griffe 1.0); upgrade to fix it
-pydantic-ai>=0.0.20
+pydantic-ai-slim[openai]==0.4.11
 
 # NLP — spaCy base (fast, broad NER)
 spacy==3.8.3

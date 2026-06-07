@@ -18,12 +18,16 @@ def get_redis() -> Redis:
         host=settings.redis_host,
         port=settings.redis_port,
         decode_responses=True,
+        max_connections=20,
     )
 
 
 @lru_cache(maxsize=1)
 def get_opensearch() -> OpenSearch:
-    return OpenSearch([{"host": settings.opensearch_host, "port": settings.opensearch_port}])
+    return OpenSearch(
+        [{"host": settings.opensearch_host, "port": settings.opensearch_port}],
+        maxsize=10,
+    )
 
 
 def get_graph_repo() -> RedisGraphRepository:

@@ -36,7 +36,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
       "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [{ "color": "purple", "value": null }] }, "unit": "short" } },
-      "targets": [{ "expr": "rate(finagent_agent_tool_calls_total[1m]) * 60", "legendFormat": "tools/min" }]
+      "targets": [{ "expr": "sum(rate(finagent_agent_tool_calls_total[1m])) * 60", "legendFormat": "tools/min" }]
     },
 
     {
@@ -106,12 +106,17 @@
       "gridPos": { "x": 0, "y": 15, "w": 14, "h": 7 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "options": { "tooltip": { "mode": "multi" }, "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "sum"] } },
-      "fieldConfig": { "defaults": { "unit": "short", "custom": { "lineWidth": 2, "fillOpacity": 15 } } },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "color": { "mode": "palette-classic" }, "custom": { "lineWidth": 2, "fillOpacity": 15 } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "search_documents" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#5794F2" } }, { "id": "displayName", "value": "search_documents" }] },
+          { "matcher": { "id": "byName", "options": "get_entity"       }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#73BF69" } }, { "id": "displayName", "value": "get_entity"       }] },
+          { "matcher": { "id": "byName", "options": "get_exposure"     }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#FADE2A" } }, { "id": "displayName", "value": "get_exposure"     }] },
+          { "matcher": { "id": "byName", "options": "expand_entity"    }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#FF9830" } }, { "id": "displayName", "value": "expand_entity"    }] }
+        ]
+      },
       "targets": [
-        { "expr": "rate(finagent_agent_tool_calls_total{tool=\"search_documents\"}[1m]) * 60", "legendFormat": "search_documents" },
-        { "expr": "rate(finagent_agent_tool_calls_total{tool=\"get_entity\"}[1m]) * 60", "legendFormat": "get_entity" },
-        { "expr": "rate(finagent_agent_tool_calls_total{tool=\"get_exposure\"}[1m]) * 60", "legendFormat": "get_exposure" },
-        { "expr": "rate(finagent_agent_tool_calls_total{tool=\"expand_entity\"}[1m]) * 60", "legendFormat": "expand_entity" }
+        { "expr": "rate(finagent_agent_tool_calls_total[1m]) * 60", "legendFormat": "{{tool}}" }
       ]
     },
 

@@ -32,7 +32,7 @@ def run_ragas(
     """
     try:
         from datasets import Dataset
-        from ragas import evaluate
+        from ragas import evaluate, RunConfig
         from ragas.metrics import (
             answer_relevancy,
             context_precision,
@@ -87,7 +87,8 @@ def run_ragas(
         metrics += [context_precision, context_recall]
 
     try:
-        result = evaluate(dataset, metrics=metrics)
+        run_cfg = RunConfig(max_workers=4, timeout=120, max_retries=10)
+        result = evaluate(dataset, metrics=metrics, run_config=run_cfg)
         scores = {k: float(v) for k, v in result.items() if isinstance(v, (int, float))}
         _log.info("RAGAS scores: %s", scores)
         return scores

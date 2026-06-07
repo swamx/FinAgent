@@ -83,6 +83,8 @@ async def run_eval(tag_filter: str | None = None, api_base: str = "http://localh
             _log.info("[%d/%d] %s", i, len(cases), case.question[:80])
 
             contexts = await _search(client, api_base, case.question)
+            if i > 1:
+                await asyncio.sleep(7)  # stay under 10/min rate limit on /chat
             answer   = await _chat(client, api_base, case.question)
 
             if not answer:

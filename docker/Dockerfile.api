@@ -4,7 +4,16 @@ WORKDIR /app
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt && \
-    python -m spacy download en_core_web_sm
+    python -m spacy download en_core_web_sm && \
+    python -c "\
+import pathlib; \
+p = next(pathlib.Path('/usr/local/lib').glob('python3.*/site-packages/pydantic_ai/usage.py')); \
+src = p.read_text(); \
+old = 'self.details[key] = self.details.get(key, 0) + value'; \
+new = 'self.details[key] = self.details.get(key, 0) + (sum(v for v in value.values() if isinstance(v, int)) if isinstance(value, dict) else int(value))'; \
+p.write_text(src.replace(old, new)); \
+print(f'Patched pydantic_ai/usage.py at {p}') \
+"
 
 COPY . .
 
