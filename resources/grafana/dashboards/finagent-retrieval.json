@@ -1,0 +1,165 @@
+{
+  "uid": "finagent-retrieval",
+  "title": "FinAgent — Retrieval Quality (HRT)",
+  "description": "Hybrid Retrieval Testing: entity resolution rate, graph expansion depth, vector search quality, BM25 boosts, circuit breakers",
+  "tags": ["finagent", "retrieval", "hrt"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "refresh": "30s",
+  "time": { "from": "now-3h", "to": "now" },
+
+  "panels": [
+
+    { "type": "row", "title": "── Retrieval Health ─────────────────────────────────────────────────────", "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 } },
+
+    {
+      "id": 1, "type": "stat", "title": "Search Requests / min",
+      "gridPos": { "x": 0, "y": 1, "w": 4, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": { "defaults": { "unit": "reqpm", "color": { "mode": "thresholds" }, "thresholds": { "steps": [{ "color": "blue", "value": null }] } } },
+      "targets": [{ "expr": "rate(finagent_search_duration_seconds_count[1m]) * 60", "legendFormat": "req/min" }]
+    },
+
+    {
+      "id": 2, "type": "stat", "title": "p95 Search Latency",
+      "gridPos": { "x": 4, "y": 1, "w": 4, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": { "colorMode": "background", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": { "defaults": { "unit": "s", "color": { "mode": "thresholds" }, "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 1 }, { "color": "red", "value": 3 }] } } },
+      "targets": [{ "expr": "histogram_quantile(0.95, rate(finagent_search_duration_seconds_bucket[5m]))", "legendFormat": "p95" }]
+    },
+
+    {
+      "id": 3, "type": "stat", "title": "Entity Resolution Rate",
+      "gridPos": { "x": 8, "y": 1, "w": 4, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": { "colorMode": "background", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "thresholds" }, "thresholds": { "steps": [{ "color": "green", "value": null }] }, "decimals": 2 } },
+      "targets": [{ "expr": "rate(finagent_retrieval_entities_per_query_sum[5m]) / rate(finagent_retrieval_entities_per_query_count[5m])", "legendFormat": "entities/query" }]
+    },
+
+    {
+      "id": 4, "type": "stat", "title": "Avg Docs Returned",
+      "gridPos": { "x": 12, "y": 1, "w": 4, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": { "colorMode": "background", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "thresholds" }, "thresholds": { "steps": [{ "color": "teal", "value": null }, { "color": "yellow", "value": 0.5 }] }, "decimals": 1 } },
+      "targets": [{ "expr": "rate(finagent_retrieval_docs_per_query_sum[5m]) / rate(finagent_retrieval_docs_per_query_count[5m])", "legendFormat": "docs/query" }]
+    },
+
+    {
+      "id": 5, "type": "stat", "title": "Graph Expansion Depth",
+      "gridPos": { "x": 16, "y": 1, "w": 4, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": { "colorMode": "background", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "thresholds" }, "thresholds": { "steps": [{ "color": "blue", "value": null }] }, "decimals": 1 } },
+      "targets": [{ "expr": "rate(finagent_retrieval_graph_hits_per_query_sum[5m]) / rate(finagent_retrieval_graph_hits_per_query_count[5m])", "legendFormat": "graph IDs/query" }]
+    },
+
+    {
+      "id": 6, "type": "stat", "title": "Open Circuit Breakers",
+      "gridPos": { "x": 20, "y": 1, "w": 4, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": { "colorMode": "background", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "thresholds" }, "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] } } },
+      "targets": [{ "expr": "increase(finagent_circuit_breaker_events_total{new_state=\"open\"}[5m])", "legendFormat": "opened" }]
+    },
+
+    { "type": "row", "title": "── Latency Distributions ────────────────────────────────────────────────", "gridPos": { "x": 0, "y": 5, "w": 24, "h": 1 } },
+
+    {
+      "id": 10, "type": "timeseries", "title": "Search Latency — p50 / p95 / p99",
+      "gridPos": { "x": 0, "y": 6, "w": 12, "h": 7 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": { "tooltip": { "mode": "multi" }, "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "mean"] } },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, rate(finagent_search_duration_seconds_bucket[2m]))", "legendFormat": "Search p50" },
+        { "expr": "histogram_quantile(0.95, rate(finagent_search_duration_seconds_bucket[2m]))", "legendFormat": "Search p95" },
+        { "expr": "histogram_quantile(0.99, rate(finagent_search_duration_seconds_bucket[2m]))", "legendFormat": "Search p99" },
+        { "expr": "histogram_quantile(0.50, rate(finagent_graph_query_duration_seconds_bucket[2m]))", "legendFormat": "Graph p50" },
+        { "expr": "histogram_quantile(0.95, rate(finagent_graph_query_duration_seconds_bucket[2m]))", "legendFormat": "Graph p95" }
+      ]
+    },
+
+    {
+      "id": 11, "type": "timeseries", "title": "Entity & Doc Counts per Query",
+      "gridPos": { "x": 12, "y": 6, "w": 12, "h": 7 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": { "tooltip": { "mode": "multi" }, "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "mean", "max"] } },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, rate(finagent_retrieval_entities_per_query_bucket[2m]))", "legendFormat": "Entities p50" },
+        { "expr": "histogram_quantile(0.95, rate(finagent_retrieval_entities_per_query_bucket[2m]))", "legendFormat": "Entities p95" },
+        { "expr": "histogram_quantile(0.50, rate(finagent_retrieval_docs_per_query_bucket[2m]))", "legendFormat": "Docs p50" },
+        { "expr": "histogram_quantile(0.95, rate(finagent_retrieval_docs_per_query_bucket[2m]))", "legendFormat": "Docs p95" },
+        { "expr": "histogram_quantile(0.50, rate(finagent_retrieval_graph_hits_per_query_bucket[2m]))", "legendFormat": "Graph hits p50" }
+      ]
+    },
+
+    { "type": "row", "title": "── Hybrid Search Quality ────────────────────────────────────────────────", "gridPos": { "x": 0, "y": 13, "w": 24, "h": 1 } },
+
+    {
+      "id": 20, "type": "timeseries", "title": "Zero-Result Rate (entity not found → kNN fallback)",
+      "gridPos": { "x": 0, "y": 14, "w": 12, "h": 6 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": { "tooltip": { "mode": "multi" }, "legend": { "displayMode": "list" } },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1 } },
+      "targets": [{
+        "expr": "clamp_min(1 - clamp_max(rate(finagent_retrieval_entities_per_query_count[5m]) / rate(finagent_search_duration_seconds_count[5m]), 1), 0)",
+        "legendFormat": "fallback rate"
+      }]
+    },
+
+    {
+      "id": 21, "type": "timeseries", "title": "Graph Expansion Hit Rate",
+      "gridPos": { "x": 12, "y": 14, "w": 12, "h": 6 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": { "tooltip": { "mode": "multi" }, "legend": { "displayMode": "list" } },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "targets": [
+        { "expr": "rate(finagent_retrieval_graph_hits_per_query_sum[5m])", "legendFormat": "graph IDs/s" },
+        { "expr": "rate(finagent_retrieval_entities_per_query_sum[5m])", "legendFormat": "resolved entities/s" }
+      ]
+    },
+
+    { "type": "row", "title": "── Circuit Breakers & Errors ────────────────────────────────────────────", "gridPos": { "x": 0, "y": 20, "w": 24, "h": 1 } },
+
+    {
+      "id": 30, "type": "timeseries", "title": "Circuit Breaker Events by Service",
+      "gridPos": { "x": 0, "y": 21, "w": 14, "h": 6 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": { "tooltip": { "mode": "multi" }, "legend": { "displayMode": "table", "placement": "right", "calcs": ["sum"] } },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 20 } } },
+      "targets": [
+        { "expr": "increase(finagent_circuit_breaker_events_total{new_state=\"open\"}[1m])", "legendFormat": "OPEN: {{service}}" },
+        { "expr": "increase(finagent_circuit_breaker_events_total{new_state=\"half_open\"}[1m])", "legendFormat": "HALF-OPEN: {{service}}" },
+        { "expr": "increase(finagent_circuit_breaker_events_total{new_state=\"closed\"}[1m])", "legendFormat": "CLOSED: {{service}}" }
+      ]
+    },
+
+    {
+      "id": 31, "type": "timeseries", "title": "Embed & LLM Errors",
+      "gridPos": { "x": 14, "y": 21, "w": 10, "h": 6 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": { "tooltip": { "mode": "multi" } },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 20 } } },
+      "targets": [
+        { "expr": "increase(finagent_embed_errors_total[1m])", "legendFormat": "embed errors" },
+        { "expr": "increase(finagent_llm_errors_total[1m])", "legendFormat": "LLM errors" }
+      ]
+    },
+
+    { "type": "row", "title": "── Retrieval Logs ───────────────────────────────────────────────────────", "gridPos": { "x": 0, "y": 27, "w": 24, "h": 1 } },
+
+    {
+      "id": 40, "type": "logs", "title": "Retrieval Events",
+      "gridPos": { "x": 0, "y": 28, "w": 24, "h": 7 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "options": { "showTime": true, "showLabels": false, "wrapLogMessage": true, "sortOrder": "Descending" },
+      "targets": [{ "expr": "{service_name=\"finagent-api\"} |~ \"(retrieval|search|graph|entity)\"", "refId": "A" }]
+    }
+
+  ]
+}

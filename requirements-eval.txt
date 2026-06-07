@@ -1,0 +1,14 @@
+# Eval runner dependencies — installed in the eval-runner image only.
+# These are NOT included in the API or worker images to keep them lean.
+#
+# Install locally for running evals outside Docker:
+#   pip install -r requirements.txt -r requirements-eval.txt
+
+# RAGAS evaluation metrics
+ragas>=0.1.19,<0.2.0
+
+# LangChain wrapper for RAGAS (routes to LiteLLM proxy)
+langchain-openai>=0.1.0,<0.3.0
+
+# HuggingFace datasets (required by RAGAS)
+datasets>=2.14.0

@@ -1,0 +1,82 @@
+# Web framework
+fastapi==0.115.4
+uvicorn[standard]==0.32.1
+
+# Async HTTP (ingestion sources)
+aiohttp==3.11.10
+
+# HTTP (sync)
+requests==2.32.3
+httpx==0.28.1
+
+# HTML parsing (SEC filings)
+beautifulsoup4==4.12.3
+lxml==5.3.0
+
+# Config / validation
+pydantic==2.10.6
+pydantic-settings==2.7.1
+python-dotenv==1.0.1
+
+# Redis (graph + cache + checkpointing)
+redis==5.2.1
+
+# JSON (fast, used by sanctions parser)
+orjson==3.10.12
+
+# OpenSearch (vector store)
+opensearch-py==2.7.1
+
+# LLM gateway — all model calls route through LiteLLM proxy via HTTP
+# The LiteLLM server runs as a separate Docker container; no SDK import needed.
+openai>=1.59.0
+
+# Agent framework (replaces LangChain / LangGraph)
+# 0.0.15 had a griffe import bug (_griffe removed in griffe 1.0); upgrade to fix it
+pydantic-ai>=0.0.20
+
+# NLP — spaCy base (fast, broad NER)
+spacy==3.8.3
+# After install: python -m spacy download en_core_web_sm
+
+# NLP — GLiNER (higher precision, financial/compliance entities)
+# Requires PyTorch; remove if image size is a concern (degrades to spaCy only)
+# huggingface_hub>=0.26 dropped proxies/resume_download from _from_pretrained kwargs;
+# gliner 0.2.13 still requires them — cap until gliner is upgraded.
+gliner==0.2.13
+huggingface_hub>=0.23,<0.26
+
+# Fuzzy entity matching
+rapidfuzz==3.10.1
+
+# Ingestion progress
+tqdm==4.67.1
+
+# Observability — core SDK
+opentelemetry-api==1.29.0
+opentelemetry-sdk==1.29.0
+
+# Observability — OTLP exporters (sends traces/metrics/logs to otel-lgtm)
+opentelemetry-exporter-otlp-proto-grpc==1.29.0
+
+# Observability — auto-instrumentation
+opentelemetry-instrumentation-fastapi==0.50b0
+opentelemetry-instrumentation-redis==0.50b0
+opentelemetry-instrumentation-aiohttp-client==0.50b0
+opentelemetry-instrumentation-requests==0.50b0
+opentelemetry-instrumentation-logging==0.50b0
+
+# Resilience
+aiobreaker==1.1.0
+aiolimiter==1.1.0
+slowapi==0.1.9
+
+# Eval — see requirements-eval.txt (not installed in API/worker image)
+
+# Utilities
+python-dateutil==2.9.0.post0
+pytz==2024.2
+
+# Test
+pytest==8.3.3
+pytest-asyncio==0.24.0

@@ -1,0 +1,61 @@
+model_list:
+
+  # PRIMARY: Qwen3-8B — dense 8B, fits fully in 8 GB VRAM, Apache 2.0
+  - model_name: qwen3-8b
+    litellm_params:
+      model: ollama/qwen3:8b
+      api_base: http://ollama:11434
+      extra_body:
+        think: false
+
+  # FALLBACK: Qwen3-4B — ~3 GB VRAM; used when 8B is OOM or unavailable
+  - model_name: qwen3-4b
+    litellm_params:
+      model: ollama/qwen3:4b
+      api_base: http://ollama:11434
+      extra_body:
+        think: false
+
+  # Embeddings: nomic-embed-text — local, 768-dim, no API key needed
+  - model_name: nomic-embed-text
+    litellm_params:
+      model: ollama/nomic-embed-text
+      api_base: http://ollama:11434
+
+
+# ==========================================================================
+# PAID / CLOUD — Anthropic (uncomment when ANTHROPIC_API_KEY is set)
+# ==========================================================================
+
+  # - model_name: claude-haiku
+  #   litellm_params:
+  #     model: anthropic/claude-haiku-4-5-20251001
+  #     api_key: os.environ/ANTHROPIC_API_KEY
+
+  # - model_name: claude-sonnet
+  #   litellm_params:
+  #     model: anthropic/claude-sonnet-4-6
+  #     api_key: os.environ/ANTHROPIC_API_KEY
+
+
+# ==========================================================================
+# ROUTER
+# ==========================================================================
+router_settings:
+  fallbacks:
+    - qwen3-8b:
+        - qwen3-4b
+
+
+# ==========================================================================
+# GLOBAL
+# ==========================================================================
+litellm_settings:
+  drop_params: true
+  success_callback: ["otel"]
+  failure_callback: ["otel"]
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  set_verbose: false
+  ui_access_mode: all

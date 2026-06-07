@@ -1,0 +1,330 @@
+﻿services:
+
+  # ── FalkorDB (drop-in RedisGraph successor; redis-stack:latest dropped GRAPH.QUERY in 7.2) ──
+  redis-stack:
+    image: falkordb/falkordb:latest
+    container_name: finagent-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+      - "3000:3000"    # FalkorDB Browser UI
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── OpenSearch (vector store + kNN) ─────────────────────────────────
+  opensearch:
+    image: opensearchproject/opensearch:2.13.0
+    container_name: finagent-opensearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - OPENSEARCH_JAVA_OPTS=-Xms1g -Xmx1g
+      - DISABLE_SECURITY_PLUGIN=true
+      - plugins.ml_commons.only_run_on_ml_node=false
+    ports:
+      - "9200:9200"
+    volumes:
+      - opensearch_data:/usr/share/opensearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health | grep -q '\"status\":\"green\"\\|\"status\":\"yellow\"'"]
+      interval: 15s
+      timeout: 10s
+      retries: 12
+      start_period: 45s
+
+  opensearch-dashboards:
+    image: opensearchproject/opensearch-dashboards:2.13.0
+    container_name: finagent-opensearch-dashboards
+    restart: unless-stopped
+    ports:
+      - "5601:5601"
+    environment:
+      - OPENSEARCH_HOSTS=http://opensearch:9200
+      - DISABLE_SECURITY_DASHBOARDS_PLUGIN=true
+    depends_on:
+      opensearch:
+        condition: service_healthy
+
+  # ── Postgres (LiteLLM metadata store) ───────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: finagent-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: litellm
+      POSTGRES_PASSWORD: litellm_password
+      POSTGRES_DB: litellm_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U litellm -d litellm_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Ollama (local LLM fallback) ──────────────────────────────────────
+  ollama:
+    image: ollama/ollama:latest
+    container_name: finagent-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 30s
+
+  ollama-init:
+    image: ollama/ollama:latest
+    container_name: finagent-ollama-init
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        echo '=== Pulling primary chat model: qwen3:8b ==='
+        ollama pull qwen3:8b
+        echo '=== Pulling fallback chat model: qwen3:4b ==='
+        ollama pull qwen3:4b
+        echo '=== Pulling embedding model: nomic-embed-text ==='
+        ollama pull nomic-embed-text
+        echo '=== All models ready ==='
+        echo 'Triggering background self-removal...'
+        (sleep 20 && curl --unix-socket /var/run/docker.sock -X DELETE "http://localhost/v1.41/containers/finagent-ollama-init?force=true") &
+    restart: "no"
+
+  # ── LiteLLM proxy (routes to Claude / Ollama) ───────────────────────
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: finagent-litellm
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./resources/litellm-config.yaml:/app/config.yaml
+      - litellm_data:/tmp
+    command:
+      - "--config"
+      - "/app/config.yaml"
+    environment:
+      - DATABASE_URL=postgresql://litellm:litellm_password@postgres:5432/litellm_db
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OLLAMA_API_BASE=http://ollama:11434
+      # OTel callback — sends every proxied LLM request as a span to Tempo
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-lgtm:4317
+      - OTEL_SERVICE_NAME=finagent-litellm
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:4000/')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
+
+  # ── OpenSanctions ingestion (run-once → Redis Graph) ─────────────────
+  sanctions-ingestor:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.worker
+    container_name: finagent-sanctions-ingestor
+    depends_on:
+      redis-stack:
+        condition: service_healthy
+    environment:
+      REDIS_HOST: redis-stack
+      REDIS_PORT: 6379
+      BATCH_SIZE: 500
+    volumes:
+      - sanctions_data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    working_dir: /app/ingestion-pipelines/sanctions-pipeline
+    # Downloads the dataset then ingests it; exits when done.
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        python downloader.py
+        echo 'Ingesting into RedisGraph...'
+        python main.py /data/entities.ftm.json
+        echo 'OpenSanctions ingestion complete.'
+        # --- Self Destruct ---
+        echo 'Triggering background self-removal...'
+        (sleep 20 && curl --unix-socket /var/run/docker.sock -X DELETE http://localhost/v1.41/containers/finagent-sanctions-ingestor?force=true) &
+    restart: "no"
+
+  # ── Document ingestion worker (5 sources → OpenSearch) ───────────────
+  doc-ingestor:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.worker
+    container_name: finagent-doc-ingestor
+    depends_on:
+      redis-stack:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
+      litellm:
+        condition: service_healthy
+    environment:
+      REDIS_HOST: redis-stack
+      REDIS_PORT: 6379
+      OPENSEARCH_HOST: opensearch
+      OPENSEARCH_PORT: 9200
+      LITELLM_BASE_URL: http://litellm:4000/v1
+      LITELLM_API_KEY: ${LITELLM_MASTER_KEY}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-nomic-embed-text}
+      EMBEDDING_DIMENSIONS: ${EMBEDDING_DIMENSIONS:-768}
+      INGEST_MODE: ${INGEST_MODE:-small}
+      SEC_USER_AGENT: ${SEC_USER_AGENT:-FinAgent/1.0 contact@example.com}
+      COURTLISTENER_TOKEN: ${COURTLISTENER_TOKEN:-}
+      ICIJ_DATA_DIR: /tmp/icij
+      OTEL_ENDPOINT: http://otel-lgtm:4317
+      OTEL_SERVICE_NAME: finagent-worker
+    volumes:
+      - icij_cache:/tmp/icij
+      - /var/run/docker.sock:/var/run/docker.sock
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        python -m apps.worker.ingestion_worker
+        echo 'Triggering background self-removal...'
+        (sleep 20 && curl --unix-socket /var/run/docker.sock -X DELETE "http://localhost/v1.41/containers/finagent-doc-ingestor?force=true") &
+    restart: "no"
+
+  # ── Grafana LGTM observability stack ────────────────────────────────
+  # All-in-one: OTel Collector + Prometheus + Loki + Tempo + Grafana.
+  # Python services send OTLP gRPC to :4317; Grafana UI is on :3100.
+  # FalkorDB already occupies host port 3000, so Grafana maps to 3100.
+  otel-lgtm:
+    image: grafana/otel-lgtm:latest
+    container_name: finagent-otel-lgtm
+    restart: unless-stopped
+    ports:
+      - "3100:3000"   # Grafana UI  →  http://localhost:3100
+      - "4317:4317"   # OTLP gRPC  (traces, metrics, logs)
+      - "4318:4318"   # OTLP HTTP  (alternative endpoint)
+    volumes:
+      - grafana_data:/data
+      - ./resources/grafana/dashboards:/otel-lgtm/grafana/dashboards/finagent
+      - ./resources/grafana/provisioning/dashboards/finagent.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/finagent.yaml
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: "Admin"
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+
+  # ── FinAgent API ─────────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    container_name: finagent-api
+    restart: unless-stopped
+    depends_on:
+      redis-stack:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
+      litellm:
+        condition: service_healthy
+      otel-lgtm:
+        condition: service_started
+    ports:
+      - "8000:8000"
+    environment:
+      REDIS_HOST: redis-stack
+      REDIS_PORT: 6379
+      OPENSEARCH_HOST: opensearch
+      OPENSEARCH_PORT: 9200
+      LITELLM_BASE_URL: http://litellm:4000/v1
+      LITELLM_API_KEY: ${LITELLM_MASTER_KEY}
+      PRIMARY_MODEL: ${PRIMARY_MODEL:-qwen3-8b}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-nomic-embed-text}
+      EMBEDDING_DIMENSIONS: ${EMBEDDING_DIMENSIONS:-768}
+      OTEL_ENDPOINT: http://otel-lgtm:4317
+      OTEL_SERVICE_NAME: finagent-api
+    command: uvicorn apps.api.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # ── Eval runner (one-shot; run manually to score the agent) ─────────
+  eval-runner:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.eval
+    container_name: finagent-eval-runner
+    depends_on:
+      api:
+        condition: service_started
+      otel-lgtm:
+        condition: service_started
+    environment:
+      LITELLM_BASE_URL: http://litellm:4000/v1
+      LITELLM_API_KEY: ${LITELLM_MASTER_KEY}
+      PRIMARY_MODEL: ${PRIMARY_MODEL:-qwen3-8b}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-nomic-embed-text}
+      FINAGENT_API_BASE: http://api:8000
+      OTEL_ENDPOINT: http://otel-lgtm:4317
+      OTEL_SERVICE_NAME: finagent-eval
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        python -m eval.runner --api http://api:8000
+        echo 'Triggering background self-removal...'
+        (sleep 20 && curl --unix-socket /var/run/docker.sock -X DELETE "http://localhost/v1.41/containers/finagent-eval-runner?force=true") &
+    restart: "no"
+
+  # ── Open WebUI (chat frontend → LiteLLM) ────────────────────────────
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: finagent-open-webui
+    restart: unless-stopped
+    ports:
+      - "3001:8080"
+    volumes:
+      - open_webui_data:/app/backend/data
+    environment:
+      OPENAI_API_BASE_URL: http://litellm:4000/v1
+      OPENAI_API_KEY: ${LITELLM_MASTER_KEY}
+      WEBUI_ADMIN_EMAIL: admin@local.host
+      WEBUI_ADMIN_PASSWORD: ${WEBUI_ADMIN_PASSWORD:-admin12345}
+      ENABLE_SIGNUP: "False"
+    depends_on:
+      litellm:
+        condition: service_healthy
+
+volumes:
+  redis_data:
+  opensearch_data:
+  ollama_data:
+  open_webui_data:
+  litellm_data:
+  postgres_data:
+  sanctions_data:
+  icij_cache:
+  grafana_data:

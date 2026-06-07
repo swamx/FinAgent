@@ -1,0 +1,11 @@
+apiVersion: 1
+providers:
+  - name: finagent
+    orgId: 1
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /otel-lgtm/grafana/dashboards/finagent
+      foldersFromFilesStructure: false

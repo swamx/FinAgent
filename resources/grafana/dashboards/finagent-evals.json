@@ -1,0 +1,159 @@
+{
+  "uid": "finagent-evals",
+  "title": "FinAgent — Evals: Hallucination + RAGAS",
+  "description": "LLM-as-judge hallucination scores + RAGAS faithfulness / answer_relevancy / context_precision / context_recall. Run: docker compose run --rm eval-runner",
+  "tags": ["finagent", "evals", "ragas", "hallucination"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "refresh": "1m",
+  "time": { "from": "now-24h", "to": "now" },
+
+  "panels": [
+
+    { "type": "row", "title": "── RAGAS Scores (latest eval run) ───────────────────────────────────────", "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 } },
+
+    {
+      "id": 1, "type": "stat", "title": "Faithfulness",
+      "description": "How well the answer is grounded in retrieved context. 1 = fully grounded, 0 = hallucinated.",
+      "gridPos": { "x": 0, "y": 1, "w": 4, "h": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": { "colorMode": "background", "graphMode": "area", "textMode": "value_and_name", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1, "decimals": 2,
+        "color": { "mode": "thresholds" },
+        "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "orange", "value": 0.6 }, { "color": "yellow", "value": 0.75 }, { "color": "green", "value": 0.85 }] }
+      } },
+      "targets": [{ "expr": "finagent_eval_score{metric=\"faithfulness\"}", "legendFormat": "Faithfulness" }]
+    },
+
+    {
+      "id": 2, "type": "stat", "title": "Answer Relevancy",
+      "description": "How relevant the answer is to the original question.",
+      "gridPos": { "x": 4, "y": 1, "w": 4, "h": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1, "decimals": 2,
+        "color": { "mode": "thresholds" },
+        "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "orange", "value": 0.6 }, { "color": "yellow", "value": 0.75 }, { "color": "green", "value": 0.85 }] }
+      } },
+      "targets": [{ "expr": "finagent_eval_score{metric=\"answer_relevancy\"}", "legendFormat": "Answer Relevancy" }]
+    },
+
+    {
+      "id": 3, "type": "stat", "title": "Context Precision",
+      "description": "Fraction of retrieved context that was actually useful for the answer.",
+      "gridPos": { "x": 8, "y": 1, "w": 4, "h": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1, "decimals": 2,
+        "color": { "mode": "thresholds" },
+        "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "orange", "value": 0.5 }, { "color": "yellow", "value": 0.7 }, { "color": "green", "value": 0.8 }] }
+      } },
+      "targets": [{ "expr": "finagent_eval_score{metric=\"context_precision\"}", "legendFormat": "Context Precision" }]
+    },
+
+    {
+      "id": 4, "type": "stat", "title": "Context Recall",
+      "description": "How much of the ground-truth answer is covered by the retrieved context.",
+      "gridPos": { "x": 12, "y": 1, "w": 4, "h": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1, "decimals": 2,
+        "color": { "mode": "thresholds" },
+        "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "orange", "value": 0.5 }, { "color": "yellow", "value": 0.7 }, { "color": "green", "value": 0.8 }] }
+      } },
+      "targets": [{ "expr": "finagent_eval_score{metric=\"context_recall\"}", "legendFormat": "Context Recall" }]
+    },
+
+    {
+      "id": 5, "type": "stat", "title": "Hallucination Rate",
+      "description": "Fraction of answers scored as hallucinated by LLM-as-judge. 0 = no hallucinations.",
+      "gridPos": { "x": 16, "y": 1, "w": 4, "h": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1, "decimals": 2,
+        "color": { "mode": "thresholds" },
+        "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 0.1 }, { "color": "orange", "value": 0.2 }, { "color": "red", "value": 0.35 }] }
+      } },
+      "targets": [{ "expr": "finagent_eval_score{metric=\"hallucination_rate\"}", "legendFormat": "Hallucination" }]
+    },
+
+    {
+      "id": 6, "type": "gauge", "title": "Overall Health",
+      "description": "Composite: avg(faithfulness, answer_relevancy).",
+      "gridPos": { "x": 20, "y": 1, "w": 4, "h": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "showThresholdLabels": true },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1,
+        "color": { "mode": "thresholds" },
+        "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "orange", "value": 0.6 }, { "color": "yellow", "value": 0.75 }, { "color": "green", "value": 0.85 }] }
+      } },
+      "targets": [{ "expr": "(finagent_eval_score{metric=\"faithfulness\"} + finagent_eval_score{metric=\"answer_relevancy\"}) / 2", "legendFormat": "Health" }]
+    },
+
+    { "type": "row", "title": "── Score Trends Over Time ───────────────────────────────────────────────", "gridPos": { "x": 0, "y": 6, "w": 24, "h": 1 } },
+
+    {
+      "id": 10, "type": "timeseries", "title": "RAGAS Score Trends",
+      "gridPos": { "x": 0, "y": 7, "w": 14, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": { "tooltip": { "mode": "multi" }, "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "min", "max"] } },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1, "custom": { "lineWidth": 2 } } },
+      "targets": [
+        { "expr": "finagent_eval_score{metric=\"faithfulness\"}", "legendFormat": "Faithfulness" },
+        { "expr": "finagent_eval_score{metric=\"answer_relevancy\"}", "legendFormat": "Answer Relevancy" },
+        { "expr": "finagent_eval_score{metric=\"context_precision\"}", "legendFormat": "Context Precision" },
+        { "expr": "finagent_eval_score{metric=\"context_recall\"}", "legendFormat": "Context Recall" }
+      ]
+    },
+
+    {
+      "id": 11, "type": "timeseries", "title": "Hallucination Rate Trend",
+      "gridPos": { "x": 14, "y": 7, "w": 10, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": { "tooltip": { "mode": "single" }, "legend": { "displayMode": "list" } },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1,
+        "custom": { "lineWidth": 2, "fillOpacity": 25 },
+        "color": { "mode": "thresholds" },
+        "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 0.2 }, { "color": "red", "value": 0.35 }] }
+      } },
+      "targets": [{ "expr": "finagent_eval_score{metric=\"hallucination_rate\"}", "legendFormat": "Hallucination Rate" }]
+    },
+
+    { "type": "row", "title": "── Score Breakdown ──────────────────────────────────────────────────────", "gridPos": { "x": 0, "y": 15, "w": 24, "h": 1 } },
+
+    {
+      "id": 20, "type": "bargauge", "title": "All Scores — Latest Run",
+      "gridPos": { "x": 0, "y": 16, "w": 12, "h": 7 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": { "orientation": "horizontal", "displayMode": "gradient", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1,
+        "color": { "mode": "thresholds" },
+        "thresholds": { "steps": [{ "color": "red", "value": null }, { "color": "yellow", "value": 0.6 }, { "color": "green", "value": 0.8 }] }
+      } },
+      "targets": [
+        { "expr": "finagent_eval_score{metric=\"faithfulness\"}", "legendFormat": "Faithfulness" },
+        { "expr": "finagent_eval_score{metric=\"answer_relevancy\"}", "legendFormat": "Answer Relevancy" },
+        { "expr": "finagent_eval_score{metric=\"context_precision\"}", "legendFormat": "Context Precision" },
+        { "expr": "finagent_eval_score{metric=\"context_recall\"}", "legendFormat": "Context Recall" },
+        { "expr": "1 - finagent_eval_score{metric=\"hallucination_rate\"}", "legendFormat": "Non-hallucination" }
+      ]
+    },
+
+    {
+      "id": 21, "type": "text", "title": "How to Run Evals",
+      "gridPos": { "x": 12, "y": 16, "w": 12, "h": 7 },
+      "options": { "mode": "markdown", "content": "## Running the Eval Suite\n\n```bash\n# Full suite (all 17 test cases)\ndocker compose run --rm eval-runner\n\n# Filter by tag\ndocker compose run --rm eval-runner \\\n  python -m eval.runner --tag sanctions\n\n# Available tags:\n# sanctions, pep, aml, icij, offshore\n# sec, court, procurement, hallucination_trap\n```\n\n## Score Thresholds\n| Metric | Green | Yellow | Red |\n|--------|-------|--------|-----|\n| Faithfulness | ≥ 0.85 | 0.75 | < 0.60 |\n| Answer Relevancy | ≥ 0.85 | 0.75 | < 0.60 |\n| Context Precision | ≥ 0.80 | 0.70 | < 0.50 |\n| Context Recall | ≥ 0.80 | 0.70 | < 0.50 |\n| Hallucination Rate | ≤ 0.10 | 0.20 | > 0.35 |\n\n_Scores persist until the next eval run. Use the time range to compare runs._" }
+    },
+
+    { "type": "row", "title": "── Eval Logs ────────────────────────────────────────────────────────────", "gridPos": { "x": 0, "y": 23, "w": 24, "h": 1 } },
+
+    {
+      "id": 30, "type": "logs", "title": "Eval Runner Logs",
+      "gridPos": { "x": 0, "y": 24, "w": 24, "h": 7 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "options": { "showTime": true, "showLabels": true, "wrapLogMessage": true, "sortOrder": "Descending" },
+      "targets": [{ "expr": "{service_name=\"finagent-eval\"}", "refId": "A" }]
+    }
+
+  ]
+}
