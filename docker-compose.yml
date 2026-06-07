@@ -95,17 +95,20 @@
       OLLAMA_HOST: http://ollama:11434
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-    # Pulls chat model + embedding model; both are needed before the API starts.
-    entrypoint: >
-      /bin/sh -c "
-      echo '=== Pulling primary chat model: qwen3:8b ===' &&
-      ollama pull qwen3:8b &&
-      echo '=== Pulling fallback: gemma3:12b ===' &&
-      ollama pull gemma3:12b &&
-      echo '=== Pulling embedding model: nomic-embed-text ===' &&
-      ollama pull nomic-embed-text &&
-      echo '=== All models ready ==='
-      "
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        echo '=== Pulling primary chat model: qwen3:8b ==='
+        ollama pull qwen3:8b
+        echo '=== Pulling fallback: gemma3:12b ==='
+        ollama pull gemma3:12b
+        echo '=== Pulling embedding model: nomic-embed-text ==='
+        ollama pull nomic-embed-text
+        echo '=== All models ready ==='
+        echo 'Triggering background self-removal...'
+        (sleep 20 && curl --unix-socket /var/run/docker.sock -X DELETE "http://localhost/v1.41/containers/finagent-ollama-init?force=true") &
     restart: "no"
 
   # ── LiteLLM proxy (routes to Claude / Ollama) ───────────────────────
@@ -201,7 +204,16 @@
       OTEL_SERVICE_NAME: finagent-worker
     volumes:
       - icij_cache:/tmp/icij
-    restart: "no"   # one-shot; re-run manually to refresh
+      - /var/run/docker.sock:/var/run/docker.sock
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        python -m apps.worker.ingestion_worker
+        echo 'Triggering background self-removal...'
+        (sleep 20 && curl --unix-socket /var/run/docker.sock -X DELETE "http://localhost/v1.41/containers/finagent-doc-ingestor?force=true") &
+    restart: "no"
 
   # ── Grafana LGTM observability stack ────────────────────────────────
   # All-in-one: OTel Collector + Prometheus + Loki + Tempo + Grafana.
@@ -275,8 +287,17 @@
       FINAGENT_API_BASE: http://api:8000
       OTEL_ENDPOINT: http://otel-lgtm:4317
       OTEL_SERVICE_NAME: finagent-eval
-    command: python -m eval.runner --api http://api:8000
-    restart: "no"   # trigger via: docker compose run --rm eval-runner
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        python -m eval.runner --api http://api:8000
+        echo 'Triggering background self-removal...'
+        (sleep 20 && curl --unix-socket /var/run/docker.sock -X DELETE "http://localhost/v1.41/containers/finagent-eval-runner?force=true") &
+    restart: "no"
 
   # ── Open WebUI (chat frontend → LiteLLM) ────────────────────────────
   open-webui:
