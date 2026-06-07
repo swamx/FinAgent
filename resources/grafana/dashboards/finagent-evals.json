@@ -8,13 +8,6 @@
   "refresh": "1m",
   "time": { "from": "now-24h", "to": "now" },
 
-  "templating": {
-    "list": [
-      { "name": "ds_prometheus", "type": "datasource", "pluginId": "prometheus", "current": { "text": "prometheus", "value": "prometheus" } },
-      { "name": "ds_loki", "type": "datasource", "pluginId": "loki", "current": { "text": "loki", "value": "loki" } }
-    ]
-  },
-
   "panels": [
 
     { "type": "row", "title": "── RAGAS Scores (latest eval run) ───────────────────────────────────────", "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 } },
@@ -23,7 +16,7 @@
       "id": 1, "type": "stat", "title": "Faithfulness",
       "description": "How well the answer is grounded in retrieved context. 1 = fully grounded, 0 = hallucinated.",
       "gridPos": { "x": 0, "y": 1, "w": 4, "h": 5 },
-      "datasource": { "type": "prometheus", "uid": "${ds_prometheus}" },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "options": { "colorMode": "background", "graphMode": "area", "textMode": "value_and_name", "reduceOptions": { "calcs": ["lastNotNull"] } },
       "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1, "decimals": 2,
         "color": { "mode": "thresholds" },
@@ -36,7 +29,7 @@
       "id": 2, "type": "stat", "title": "Answer Relevancy",
       "description": "How relevant the answer is to the original question.",
       "gridPos": { "x": 4, "y": 1, "w": 4, "h": 5 },
-      "datasource": { "type": "prometheus", "uid": "${ds_prometheus}" },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
       "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1, "decimals": 2,
         "color": { "mode": "thresholds" },
@@ -49,7 +42,7 @@
       "id": 3, "type": "stat", "title": "Context Precision",
       "description": "Fraction of retrieved context that was actually useful for the answer.",
       "gridPos": { "x": 8, "y": 1, "w": 4, "h": 5 },
-      "datasource": { "type": "prometheus", "uid": "${ds_prometheus}" },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
       "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1, "decimals": 2,
         "color": { "mode": "thresholds" },
@@ -62,7 +55,7 @@
       "id": 4, "type": "stat", "title": "Context Recall",
       "description": "How much of the ground-truth answer is covered by the retrieved context.",
       "gridPos": { "x": 12, "y": 1, "w": 4, "h": 5 },
-      "datasource": { "type": "prometheus", "uid": "${ds_prometheus}" },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
       "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1, "decimals": 2,
         "color": { "mode": "thresholds" },
@@ -75,7 +68,7 @@
       "id": 5, "type": "stat", "title": "Hallucination Rate",
       "description": "Fraction of answers scored as hallucinated by LLM-as-judge. 0 = no hallucinations.",
       "gridPos": { "x": 16, "y": 1, "w": 4, "h": 5 },
-      "datasource": { "type": "prometheus", "uid": "${ds_prometheus}" },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
       "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1, "decimals": 2,
         "color": { "mode": "thresholds" },
@@ -88,7 +81,7 @@
       "id": 6, "type": "gauge", "title": "Overall Health",
       "description": "Composite: avg(faithfulness, answer_relevancy).",
       "gridPos": { "x": 20, "y": 1, "w": 4, "h": 5 },
-      "datasource": { "type": "prometheus", "uid": "${ds_prometheus}" },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "showThresholdLabels": true },
       "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1,
         "color": { "mode": "thresholds" },
@@ -102,7 +95,7 @@
     {
       "id": 10, "type": "timeseries", "title": "RAGAS Score Trends",
       "gridPos": { "x": 0, "y": 7, "w": 14, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "${ds_prometheus}" },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "options": { "tooltip": { "mode": "multi" }, "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "min", "max"] } },
       "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1, "custom": { "lineWidth": 2 } } },
       "targets": [
@@ -116,7 +109,7 @@
     {
       "id": 11, "type": "timeseries", "title": "Hallucination Rate Trend",
       "gridPos": { "x": 14, "y": 7, "w": 10, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "${ds_prometheus}" },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "options": { "tooltip": { "mode": "single" }, "legend": { "displayMode": "list" } },
       "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1,
         "custom": { "lineWidth": 2, "fillOpacity": 25 },
@@ -131,7 +124,7 @@
     {
       "id": 20, "type": "bargauge", "title": "All Scores — Latest Run",
       "gridPos": { "x": 0, "y": 16, "w": 12, "h": 7 },
-      "datasource": { "type": "prometheus", "uid": "${ds_prometheus}" },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "options": { "orientation": "horizontal", "displayMode": "gradient", "reduceOptions": { "calcs": ["lastNotNull"] } },
       "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1,
         "color": { "mode": "thresholds" },
@@ -157,7 +150,7 @@
     {
       "id": 30, "type": "logs", "title": "Eval Runner Logs",
       "gridPos": { "x": 0, "y": 24, "w": 24, "h": 7 },
-      "datasource": { "type": "loki", "uid": "${ds_loki}" },
+      "datasource": { "type": "loki", "uid": "loki" },
       "options": { "showTime": true, "showLabels": true, "wrapLogMessage": true, "sortOrder": "Descending" },
       "targets": [{ "expr": "{service_name=\"finagent-eval\"}", "refId": "A" }]
     }

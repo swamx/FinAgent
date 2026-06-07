@@ -8,23 +8,6 @@
   "refresh": "15s",
   "time": { "from": "now-1h", "to": "now" },
 
-  "templating": {
-    "list": [
-      {
-        "name": "ds_prometheus", "type": "datasource", "pluginId": "prometheus",
-        "current": { "text": "prometheus", "value": "prometheus" }
-      },
-      {
-        "name": "ds_tempo", "type": "datasource", "pluginId": "tempo",
-        "current": { "text": "tempo", "value": "tempo" }
-      },
-      {
-        "name": "ds_loki", "type": "datasource", "pluginId": "loki",
-        "current": { "text": "loki", "value": "loki" }
-      }
-    ]
-  },
-
   "panels": [
 
     { "type": "row", "title": "── Overview ──────────────────────────────────────────────────────────", "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 }, "collapsed": false },
@@ -32,7 +15,7 @@
     {
       "id": 1, "type": "stat", "title": "Chat Requests / min",
       "gridPos": { "x": 0, "y": 1, "w": 4, "h": 4 },
-      "datasource": { "type": "prometheus", "uid": "${ds_prometheus}" },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
       "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [{ "color": "blue", "value": null }] }, "unit": "reqpm" } },
       "targets": [{ "expr": "rate(http_server_request_duration_milliseconds_count{http_route=\"/chat\"}[1m]) * 60", "legendFormat": "chat" }]
@@ -41,7 +24,7 @@
     {
       "id": 2, "type": "stat", "title": "p95 End-to-end Latency",
       "gridPos": { "x": 4, "y": 1, "w": 4, "h": 4 },
-      "datasource": { "type": "prometheus", "uid": "${ds_prometheus}" },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "options": { "colorMode": "background", "reduceOptions": { "calcs": ["lastNotNull"] } },
       "fieldConfig": { "defaults": { "unit": "s", "color": { "mode": "thresholds" }, "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 5 }, { "color": "red", "value": 15 }] } } },
       "targets": [{ "expr": "histogram_quantile(0.95, rate(finagent_llm_duration_seconds_bucket[5m]))", "legendFormat": "LLM p95" }]
@@ -50,7 +33,7 @@
     {
       "id": 3, "type": "stat", "title": "Tool Calls / min",
       "gridPos": { "x": 8, "y": 1, "w": 4, "h": 4 },
-      "datasource": { "type": "prometheus", "uid": "${ds_prometheus}" },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
       "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [{ "color": "purple", "value": null }] }, "unit": "short" } },
       "targets": [{ "expr": "rate(finagent_agent_tool_calls_total[1m]) * 60", "legendFormat": "tools/min" }]
@@ -59,7 +42,7 @@
     {
       "id": 4, "type": "stat", "title": "Avg Entities / Query",
       "gridPos": { "x": 12, "y": 1, "w": 4, "h": 4 },
-      "datasource": { "type": "prometheus", "uid": "${ds_prometheus}" },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "options": { "colorMode": "background", "reduceOptions": { "calcs": ["lastNotNull"] } },
       "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "thresholds" }, "thresholds": { "steps": [{ "color": "blue", "value": null }] } } },
       "targets": [{ "expr": "rate(finagent_retrieval_entities_per_query_sum[5m]) / rate(finagent_retrieval_entities_per_query_count[5m])", "legendFormat": "avg entities" }]
@@ -68,7 +51,7 @@
     {
       "id": 5, "type": "stat", "title": "Avg Docs / Query",
       "gridPos": { "x": 16, "y": 1, "w": 4, "h": 4 },
-      "datasource": { "type": "prometheus", "uid": "${ds_prometheus}" },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "options": { "colorMode": "background", "reduceOptions": { "calcs": ["lastNotNull"] } },
       "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "thresholds" }, "thresholds": { "steps": [{ "color": "teal", "value": null }] } } },
       "targets": [{ "expr": "rate(finagent_retrieval_docs_per_query_sum[5m]) / rate(finagent_retrieval_docs_per_query_count[5m])", "legendFormat": "avg docs" }]
@@ -77,7 +60,7 @@
     {
       "id": 6, "type": "stat", "title": "LLM Errors",
       "gridPos": { "x": 20, "y": 1, "w": 4, "h": 4 },
-      "datasource": { "type": "prometheus", "uid": "${ds_prometheus}" },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "options": { "colorMode": "background", "reduceOptions": { "calcs": ["lastNotNull"] } },
       "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "thresholds" }, "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] } } },
       "targets": [{ "expr": "increase(finagent_llm_errors_total[5m])", "legendFormat": "errors" }]
@@ -88,7 +71,7 @@
     {
       "id": 10, "type": "timeseries", "title": "Stage Latency — p50 / p95 / p99",
       "gridPos": { "x": 0, "y": 6, "w": 16, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "${ds_prometheus}" },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "options": { "tooltip": { "mode": "multi" }, "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "mean", "max"] } },
       "fieldConfig": { "defaults": { "unit": "s", "custom": { "lineWidth": 2 } } },
       "targets": [
@@ -105,7 +88,7 @@
     {
       "id": 11, "type": "bargauge", "title": "Avg Stage Latency",
       "gridPos": { "x": 16, "y": 6, "w": 8, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "${ds_prometheus}" },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "options": { "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"] }, "displayMode": "gradient" },
       "fieldConfig": { "defaults": { "unit": "s", "min": 0, "color": { "mode": "continuous-BlPu" } } },
       "targets": [
@@ -121,7 +104,7 @@
     {
       "id": 20, "type": "timeseries", "title": "Tool Calls / min by Tool",
       "gridPos": { "x": 0, "y": 15, "w": 14, "h": 7 },
-      "datasource": { "type": "prometheus", "uid": "${ds_prometheus}" },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "options": { "tooltip": { "mode": "multi" }, "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "sum"] } },
       "fieldConfig": { "defaults": { "unit": "short", "custom": { "lineWidth": 2, "fillOpacity": 15 } } },
       "targets": [
@@ -135,7 +118,7 @@
     {
       "id": 21, "type": "piechart", "title": "Tool Call Share (window)",
       "gridPos": { "x": 14, "y": 15, "w": 10, "h": 7 },
-      "datasource": { "type": "prometheus", "uid": "${ds_prometheus}" },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "options": { "displayLabels": ["percent", "name"], "legend": { "displayMode": "table", "placement": "right", "calcs": ["sum"] } },
       "targets": [
         { "expr": "increase(finagent_agent_tool_calls_total[1h])", "legendFormat": "{{tool}}" }
@@ -147,7 +130,7 @@
     {
       "id": 30, "type": "traces", "title": "Live Traces — finagent-api",
       "gridPos": { "x": 0, "y": 23, "w": 24, "h": 12 },
-      "datasource": { "type": "tempo", "uid": "${ds_tempo}" },
+      "datasource": { "type": "tempo", "uid": "tempo" },
       "targets": [{
         "queryType": "nativeSearch",
         "serviceName": "finagent-api",
@@ -165,7 +148,7 @@
     {
       "id": 40, "type": "logs", "title": "Tool Call Logs",
       "gridPos": { "x": 0, "y": 36, "w": 24, "h": 8 },
-      "datasource": { "type": "loki", "uid": "${ds_loki}" },
+      "datasource": { "type": "loki", "uid": "loki" },
       "options": { "showTime": true, "showLabels": true, "wrapLogMessage": true, "dedupStrategy": "none", "sortOrder": "Descending" },
       "targets": [{
         "expr": "{service_name=\"finagent-api\"} |= \"tool_call\"",
