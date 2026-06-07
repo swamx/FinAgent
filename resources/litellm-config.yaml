@@ -11,6 +11,10 @@ model_list:
     litellm_params:
       model: ollama/qwen3:8b
       api_base: http://ollama:11434
+      # Disable Qwen3 extended chain-of-thought thinking mode.
+      # Without this, a single compliance answer takes 6–9 minutes.
+      extra_body:
+        think: false
 
   # Fallback: Gemma-3-12B — also fits in 8 GB VRAM at Q3_K_M
   - model_name: gemma3-12b
@@ -23,6 +27,8 @@ model_list:
     litellm_params:
       model: ollama/qwen3:30b-a3b
       api_base: http://ollama:11434
+      extra_body:
+        think: false
 
   # Embeddings: nomic-embed-text — local, 768-dim, no API key needed
   - model_name: nomic-embed-text

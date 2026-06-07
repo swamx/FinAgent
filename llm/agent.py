@@ -128,13 +128,10 @@ class ComplianceAgent:
         import time
         tracer = get_tracer()
         t0 = time.time()
-        # /no_think disables Qwen3's extended chain-of-thought mode per turn,
-        # dropping latency from several minutes to ~15–30 s.
-        prompt = f"/no_think {question}"
         with tracer.start_as_current_span("llm.agent_run") as span:
             span.set_attribute("question.length", len(question))
             try:
-                result = await llm_breaker.call_async(agent.run, prompt, deps=self.deps)
+                result = await llm_breaker.call_async(agent.run, question, deps=self.deps)
                 llm_duration.record(time.time() - t0)
                 return result.data
             except Exception as exc:
