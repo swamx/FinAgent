@@ -33,10 +33,10 @@ model_list:
 
 # PAID / CLOUD — Anthropic (uncomment when ANTHROPIC_API_KEY is set)
 
-  # - model_name: claude-haiku
-  #   litellm_params:
-  #     model: anthropic/claude-haiku-4-5-20251001
-  #     api_key: os.environ/ANTHROPIC_API_KEY
+  - model_name: claude-haiku
+    litellm_params:
+      model: anthropic/claude-haiku-4-5-20251001
+      api_key: os.environ/ANTHROPIC_API_KEY
 
   # - model_name: claude-sonnet
   #   litellm_params:

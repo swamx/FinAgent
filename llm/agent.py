@@ -4,6 +4,7 @@ import logging
 from dataclasses import dataclass
 
 from pydantic_ai import Agent, RunContext
+from pydantic_ai.exceptions import UsageLimitExceeded
 from pydantic_ai.usage import UsageLimits
 from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.providers.openai import OpenAIProvider
@@ -145,6 +146,16 @@ class ComplianceAgent:
                 )
                 llm_duration.record(time.time() - t0)
                 return result.data
+            except UsageLimitExceeded as exc:
+                # Agent hit the 8-request cap — return whatever it produced so far
+                llm_duration.record(time.time() - t0)
+                partial = getattr(exc, "output", None) or getattr(exc, "result", None)
+                if partial and isinstance(partial, str):
+                    return partial
+                return (
+                    "I was unable to complete the full analysis within the request limit. "
+                    "Please try rephrasing with a more specific question."
+                )
             except Exception as exc:
                 llm_errors.add(1)
                 span.record_exception(exc)

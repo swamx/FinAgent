@@ -73,7 +73,7 @@ class HallucinationDetector:
 
         context_text = "\n\n---\n\n".join(c.strip() for c in context[:5] if c.strip())
         if not context_text:
-            return 0.5, "No context retrieved — cannot evaluate groundedness"
+            context_text = "(no documents retrieved — score based on answer plausibility only)"
 
         prompt = _JUDGE_PROMPT.format(
             question=question,
@@ -81,6 +81,7 @@ class HallucinationDetector:
             answer=answer,
         )
 
+        raw = ""
         try:
             resp = self._client.chat.completions.create(
                 model=settings.primary_model,
@@ -89,6 +90,12 @@ class HallucinationDetector:
                 max_tokens=200,
             )
             raw = resp.choices[0].message.content.strip()
+            # Strip markdown code fences if the model wraps its response
+            if raw.startswith("```"):
+                raw = raw.split("```")[1]
+                if raw.startswith("json"):
+                    raw = raw[4:]
+                raw = raw.strip()
             data = json.loads(raw)
             score = float(data.get("score", 0.5))
             reasoning = str(data.get("reasoning", ""))
