@@ -100,6 +100,40 @@ def _name_in_text(name: str, text: str) -> bool:
     return False
 
 
+def _contract_signal(result: SearchResult, query: str, resolver) -> str | None:
+    """Return entity name if it appears in a USASpending contract doc in result.
+
+    Used to prepend a positive "entity found in contracts" hint to the
+    search_documents return value, so the agent does not dismiss contract
+    records as irrelevant when asked a compliance question.
+
+    Only fires when:
+    - At least one returned document has source "procurement" (USASpending)
+    - The entity name extracted from the query appears in that document's text
+    """
+    spending_docs = [
+        d for d in result.documents
+        if (d.source or "").lower() == "procurement"
+    ]
+    if not spending_docs:
+        return None
+
+    caps = _extract_caps_mentions(query)
+    spacy_mentions = resolver.extract_mentions(query)
+    seen: set[str] = set()
+    candidates: list[str] = []
+    for m in caps + spacy_mentions:
+        if m not in seen:
+            seen.add(m)
+            candidates.append(m)
+
+    spending_text = " ".join(d.text.lower() for d in spending_docs)
+    for name in candidates:
+        if _name_in_text(name, spending_text):
+            return name
+    return None
+
+
 def _mismatch_names(result: SearchResult, query: str, resolver) -> list[str]:
     """Return entity names from query absent from retrieved docs.
 
@@ -163,13 +197,6 @@ agent = Agent(
         "[USASpending], [GDELT News], [OpenSanctions]. "
         "Example: 'Acme Corp received a $2M fine for OFAC violations [SEC EDGAR]. "
         "The company is connected to three sanctioned individuals [OpenSanctions].' "
-        "KNOWLEDGE BASE SCOPE: The knowledge base spans all of the above datasets "
-        "including [USASpending] federal contract awards — these ARE compliance-relevant "
-        "records showing which entities conduct government business. When "
-        "search_documents returns contract documents that name the queried entity, "
-        "that entity IS present in the knowledge base — report the contract details "
-        "and cite [USASpending]. Do NOT dismiss contract records as irrelevant because "
-        "the question used the word 'compliance' or 'sanctions'. "
         "CRITICAL — NO FABRICATION: Do NOT invent specific facts — entity names, "
         "sanctions designations, contract values, financial figures, legal outcomes, "
         "or PEP/watchlist status — that are absent from tool results. Base every "
@@ -181,11 +208,6 @@ agent = Agent(
         "about [topic]. I could not find this in the knowledge base.' "
         "Do not redirect, do not explain system limitations at length, do not "
         "offer alternative topics. "
-        "OUT-OF-SCOPE QUESTIONS: For questions entirely outside compliance scope — "
-        "e.g., current stock prices, sports results, celebrity executives of companies "
-        "not in this database, or historical facts unrelated to your datasets — "
-        "you may answer briefly from your training knowledge and note: "
-        "'This is general knowledge, not from the compliance knowledge base.' "
         "DATA FORMAT: A document field 'PEP/Sanctions flag: NO' means the entity "
         "is NOT designated as a PEP or placed on a sanctions list — do not "
         "describe such an entity as sanctioned or flagged. Always cite the exact "
@@ -227,17 +249,31 @@ def search_documents(ctx: RunContext[AgentDeps], query: str) -> str:
                     f"knowledge base.' Do NOT use your training knowledge."
                 )
 
+        contract_name: str | None = None
         if warning:
             json_result = warning
         else:
             json_result = result.model_dump_json()
+            # Positive contract signal: tell agent explicitly when the queried
+            # entity appears in USASpending records so it doesn't dismiss them.
+            contract_name = _contract_signal(
+                result, query, ctx.deps.retrieval.resolver
+            )
+            if contract_name:
+                json_result = (
+                    f"CONTRACT FOUND: '{contract_name}' appears in federal "
+                    f"contract records in the results below "
+                    f"(source: [USASpending]). Report the contract details "
+                    f"and cite [USASpending].\n\n" + json_result
+                )
 
         span.set_attribute("tool.output.entities_found", len(result.entities))
         span.set_attribute("tool.output.docs_returned", len(result.documents))
         _log.info(
-            "tool_call tool=search_documents entities=%d docs=%d query=%r warning=%s",
+            "tool_call tool=search_documents entities=%d docs=%d query=%r "
+            "warning=%s contract_signal=%s",
             len(result.entities), len(result.documents), query[:120],
-            bool(warning),
+            bool(warning), bool(contract_name),
         )
         return json_result
 

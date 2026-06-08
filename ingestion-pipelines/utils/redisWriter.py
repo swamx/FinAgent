@@ -9,8 +9,6 @@ class RedisWriter:
     and edges rather than flat Redis hashes.
     """
 
-    _GRAPH = "entities"
-
     # All fields emitted by sanctionsParser.parse_entity (schema-specific ones
     # default to "" when absent so every batch row has a uniform shape).
     _ENTITY_FIELDS = [
@@ -30,8 +28,9 @@ class RedisWriter:
         "description",
     ]
 
-    def __init__(self, host: str, port: int):
+    def __init__(self, host: str, port: int, graph: str = "entities"):
         self.redis = Redis(host=host, port=port, decode_responses=True)
+        self._graph = graph
 
     # ------------------------------------------------------------------
     # Public API
@@ -60,7 +59,7 @@ class RedisWriter:
             f"SET {set_clause}"
         )
         try:
-            self.redis.execute_command("GRAPH.QUERY", self._GRAPH, query)
+            self.redis.execute_command("GRAPH.QUERY", self._graph, query)
         except Exception:
             for e in entities:
                 self._upsert_entity(e)
@@ -87,7 +86,7 @@ class RedisWriter:
         )
         query = f"MERGE (e:Entity {{id: '{eid}'}}) SET {set_parts}"
         try:
-            self.redis.execute_command("GRAPH.QUERY", self._GRAPH, query)
+            self.redis.execute_command("GRAPH.QUERY", self._graph, query)
         except Exception:
             pass
 
@@ -100,7 +99,7 @@ class RedisWriter:
             f"MERGE (a)-[:{rel_type}]->(b)"
         )
         try:
-            self.redis.execute_command("GRAPH.QUERY", self._GRAPH, query)
+            self.redis.execute_command("GRAPH.QUERY", self._graph, query)
         except Exception:
             pass
 
