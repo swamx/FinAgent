@@ -15,6 +15,44 @@ AML / PEP / sanctions investigation platform combining a knowledge graph (Falkor
 
 ---
 
+## Screenshots
+
+**Procurement cross-reference — SAIC / VA contract**
+![SAIC VA contract query](docs/screenshots/01_saic_contract.png)
+
+**Out-of-scope refusal — hallucination guard**
+![Apple stock price refusal](docs/screenshots/02_apple_refusal.png)
+
+**ICIJ Offshore Leaks — Panama Papers shell companies**
+![Panama Papers shell companies](docs/screenshots/03_panama_papers.png)
+
+**Direct hybrid search — sanctioned entities (`/search`)**
+![Sanctioned entity search](docs/screenshots/04_entity_search.png)
+
+### Observability — Grafana
+
+**FinAgent — Overview (embedding, LLM & graph latency)**
+![Grafana Overview](docs/screenshots/05_grafana_overview.png)
+
+**FinAgent — Request Flow (p95 end-to-end, tool call distribution)**
+![Grafana Request Flow](docs/screenshots/06_grafana_flow.png)
+
+**FinAgent — Retrieval Quality (search rate, entity resolution, doc counts)**
+![Grafana Retrieval Quality](docs/screenshots/07_grafana_retrieval.png)
+
+**FinAgent — Evals: Hallucination + RAGAS score trends**
+![Grafana Evals](docs/screenshots/08_grafana_evals.png)
+
+### LLM Gateway — LiteLLM
+
+**LiteLLM — Model management (Qwen3, nomic-embed-text, Claude Haiku)**
+![LiteLLM Models](docs/screenshots/10_litellm_models.png)
+
+**LiteLLM — Usage (66 k requests · 17.7 M tokens · $21 total spend)**
+![LiteLLM Usage](docs/screenshots/11_litellm_usage.png)
+
+---
+
 ## Quick Start
 
 Full instructions including troubleshooting in **[docs/Setup.md](docs/Setup.md)**.

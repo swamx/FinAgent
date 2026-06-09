@@ -4,6 +4,22 @@
 
 ---
 
+## Chat Screenshots
+
+**Scenario 1 — Procurement cross-reference (SAIC / VA contract)**
+![SAIC VA contract query](screenshots/01_saic_contract.png)
+
+**Scenario 2 — Out-of-scope refusal (hallucination guard active)**
+![Apple stock price refusal](screenshots/02_apple_refusal.png)
+
+**Scenario 3 — ICIJ Offshore Leaks / Panama Papers**
+![Panama Papers shell companies](screenshots/03_panama_papers.png)
+
+**Direct hybrid search — `/search` endpoint, no LLM**
+![Sanctioned entity search](screenshots/04_entity_search.png)
+
+---
+
 > **Live system.** All trace IDs, log lines, and tool-call sequences below were captured from real `/chat` requests on 2026-06-09.
 > Replay any query with:
 > ```bash
@@ -464,6 +480,28 @@ provider such as Bloomberg, Reuters, or a brokerage platform.
 > The agent did not invent a stock price. This is the behaviour that makes FinAgent safe to use in production compliance workflows.
 
 ---
+
+---
+
+## Observability Screenshots
+
+**Grafana — Overview (embedding · LLM · graph latency)**
+![Grafana Overview](screenshots/05_grafana_overview.png)
+
+**Grafana — Request Flow (p95 end-to-end, tool call distribution)**
+![Grafana Request Flow](screenshots/06_grafana_flow.png)
+
+**Grafana — Retrieval Quality (16 req/m · p95 4.75 s · 0.25 entity resolution)**
+![Grafana Retrieval](screenshots/07_grafana_retrieval.png)
+
+**Grafana — Evals: Hallucination + RAGAS**
+![Grafana Evals](screenshots/08_grafana_evals.png)
+
+**LiteLLM — Model Management (Qwen3 · nomic-embed-text · Claude Haiku)**
+![LiteLLM Models](screenshots/10_litellm_models.png)
+
+**LiteLLM — Usage (66 k requests · 17.7 M tokens · $21 spend)**
+![LiteLLM Usage](screenshots/11_litellm_usage.png)
 
 ---
 

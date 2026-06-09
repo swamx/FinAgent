@@ -1,0 +1,76 @@
+flowchart TD
+    Q([User Query]) --> NER
+
+    subgraph ER["① Entity Resolution  (EntityResolver)"]
+        NER["SpaCy NER\nen_core_web_sm\nPERSON · ORG · GPE · FAC"]
+        NER --> EX["Extract Mentions"]
+        EX --> EL{"Exact match\nin Redis Graph?\n(toLower GRAPH.QUERY)"}
+        EL -->|hit| RE["Resolved Entity"]
+        EL -->|miss| FZ["Fuzzy lookup\nrapidfuzz token_sort_ratio ≥ 85\n(pre-warmed name index)"]
+        FZ -->|hit| RE
+        FZ -->|no match| SKIP["Skip mention"]
+    end
+
+    RE --> GX
+    SKIP --> GX
+
+    subgraph GR["② Graph Expansion  (RedisGraphRepository)"]
+        GX{"Entities\nresolved?"}
+        GX -->|yes| HOP["expand_entity(id, hops=2)\n2-hop graph traversal\n→ related_ids"]
+        GX -->|no| NOHOP["related_ids = []"]
+    end
+
+    subgraph EMB["③ Embed Query"]
+        EM["embed(query)\n→ float vector"]
+    end
+
+    HOP --> BRANCH
+    NOHOP --> BRANCH
+    EM --> BRANCH
+
+    BRANCH{"Graph\nhits found?"}
+
+    subgraph HA["④-A  Hybrid Entity-Filtered  (entities found)"]
+        direction TB
+        P1["get_entity_profiles(entity_ids)\nDeterministic profile docs"]
+        P2["search_hybrid(related_ids, embedding, query)\nBM25 + kNN filtered to graph IDs"]
+        P3["search(embedding, k)\nUnrestricted kNN fallback"]
+        MRG["Dedup merge\nprofiles → entity-filtered → kNN\n→ top-k"]
+        P1 & P2 & P3 --> MRG
+    end
+
+    subgraph HB["④-B  kNN + Name Supplement  (no entity match)"]
+        direction TB
+        K1["search(embedding, k)\nPure kNN"]
+        NM{"Mentions\nextracted?"}
+        K1 --> NM
+        NM -->|yes| NS["search_by_entity_names(mentions, k=3)\nBM25 name supplement (bonus, cap 3)"]
+        NM -->|no| MRG2["Dedup merge → top-k"]
+        NS --> MRG2
+    end
+
+    BRANCH -->|yes| HA
+    BRANCH -->|no| HB
+
+    MRG --> OUT
+    MRG2 --> OUT
+
+    subgraph OBS["Observability (every path)"]
+        direction LR
+        T1["search_duration"]
+        T2["entities_per_query"]
+        T3["graph_hits_per_query"]
+        T4["docs_per_query"]
+        T5["OTel spans per stage"]
+    end
+
+    Out --> OBS
+
+    Out([SearchResult\nquery · entities · documents])
+
+    style ER fill:#dbeafe,stroke:#3b82f6
+    style GR fill:#dcfce7,stroke:#22c55e
+    style EMB fill:#fef9c3,stroke:#eab308
+    style HA fill:#ede9fe,stroke:#8b5cf6
+    style HB fill:#ffe4e6,stroke:#f43f5e
+    style OBS fill:#f1f5f9,stroke:#94a3b8
