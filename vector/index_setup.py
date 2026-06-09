@@ -28,14 +28,40 @@ _NEW_PROPERTIES: dict = {
 }
 
 
+def _has_correct_schema(client: OpenSearch) -> bool:
+    """Return True if the existing index has knn_vector embedding (our schema)."""
+    try:
+        mapping = client.indices.get_mapping(index=settings.opensearch_index)
+        props = (
+            mapping.get(settings.opensearch_index, {})
+            .get("mappings", {})
+            .get("properties", {})
+        )
+        return props.get("embedding", {}).get("type") == "knn_vector"
+    except Exception:
+        return False
+
+
 def create_fintech_index(client: OpenSearch) -> None:
     """Idempotent — safe to call on every startup.
 
     Creates the index the first time; on subsequent calls adds any new
     field mappings that are missing (e.g. after a schema migration).
     knn_vector and index-level settings are set only at creation time.
+
+    If an existing index has wrong schema (e.g. auto-created by a bulk call
+    before this function ran), it is deleted and recreated from scratch.
     """
-    if not client.indices.exists(index=settings.opensearch_index):
+    exists = client.indices.exists(index=settings.opensearch_index)
+    if exists and not _has_correct_schema(client):
+        print(
+            f"WARNING: {settings.opensearch_index} has wrong schema (no knn_vector). "
+            "Deleting and recreating."
+        )
+        client.indices.delete(index=settings.opensearch_index)
+        exists = False
+
+    if not exists:
         client.indices.create(
             index=settings.opensearch_index,
             body={

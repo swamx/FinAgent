@@ -1,5 +1,9 @@
 # FinAgent — Links Reference
 
+**Navigation:** [README](../README.md) · [Architecture](Architecture.md) · [Setup](Setup.md) · [Agent Workflow](AgentWorkflowExplaination.md) · [Ingestion](IngestionFlow.md) · [Demo](Demo.md)
+
+---
+
 ## Local Services
 
 | Service | URL | Credentials |
@@ -72,13 +76,22 @@ These are the ports your services write telemetry to — not browser URLs.
 
 ## FalkorDB / Graph
 
+Two graphs are maintained — `entities` (sanctions/PEP/crime) and `kyb` (company registries).
+
 | Resource | URL / Command |
 | --- | --- |
 | Browser UI | <http://localhost:3000> |
 | Redis CLI | `docker exec finagent-redis redis-cli` |
+| **Sanctions graph (`entities`)** | |
 | Node count | `GRAPH.QUERY entities "MATCH (n) RETURN count(n)"` |
 | Edge count | `GRAPH.QUERY entities "MATCH ()-[r]->() RETURN count(r)"` |
 | Entity schemas | `GRAPH.QUERY entities "MATCH (n:Entity) RETURN n.schema, count(n) ORDER BY count(n) DESC"` |
+| Topics breakdown | `GRAPH.QUERY entities "MATCH (n:Entity) WHERE n.topics <> '' RETURN n.topics, count(n) ORDER BY count(n) DESC"` |
+| **KYB graph (`kyb`)** | |
+| Node count | `GRAPH.QUERY kyb "MATCH (n) RETURN count(n)"` |
+| Edge count | `GRAPH.QUERY kyb "MATCH ()-[r]->() RETURN count(r)"` |
+| Entity schemas | `GRAPH.QUERY kyb "MATCH (n:Entity) RETURN n.schema, count(n) ORDER BY count(n) DESC"` |
+| Find company by name | `GRAPH.QUERY kyb "MATCH (n:Entity) WHERE toLower(n.name) CONTAINS 'acme' RETURN n.id, n.name, n.country LIMIT 10"` |
 
 ---
 
@@ -126,3 +139,6 @@ These are the ports your services write telemetry to — not browser URLs.
 | [observability/circuit_breakers.py](observability/circuit_breakers.py) | Per-service circuit breakers |
 | [Setup.md](Setup.md) | Full setup guide with curl examples |
 | [Architecture.md](Architecture.md) | System architecture and design decisions |
+| [AgentWorkflowExplaination.md](AgentWorkflowExplaination.md) | Service & agent flow diagram, tool reference table |
+| [IngestionFlow.md](IngestionFlow.md) | Ingestion pipeline + 4 alternative architectures with comparison |
+| [Demo.md](Demo.md) | 3 live demo scenarios with trace IDs and expected outputs |

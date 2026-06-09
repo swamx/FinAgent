@@ -19,6 +19,14 @@ class Settings(BaseSettings):
     opensanctions_url: str = (
         "https://data.opensanctions.org/datasets/latest/default/entities.ftm.json"
     )
+    kyb_url: str = (
+        "https://data.opensanctions.org/datasets/latest/kyb/entities.ftm.json"
+    )
+
+    # RedisGraph graph names — must match the ingestor environment variables
+    sanctions_graph: str = "entities"
+    kyb_graph: str = "kyb"
+
     batch_size: int = 500
 
     # Ingestion source settings

@@ -18,14 +18,15 @@ from core.config import settings
 _log = logging.getLogger(__name__)
 
 _JUDGE_PROMPT = """\
-You are a factual accuracy judge for a compliance research system.
+You are a factual accuracy judge for a compliance retrieval system.
 
 Given:
 1. A question posed by a compliance analyst
-2. Retrieved context passages (the only ground truth available)
+2. Retrieved context passages
 3. An AI-generated answer
 
-Rate how well the answer is supported by the provided context.
+Your task: evaluate whether the answer is relevant and useful for the question, \
+and whether it uses any retrieved context that was provided.
 
 Question:
 {question}
@@ -36,12 +37,18 @@ Retrieved Context:
 AI Answer:
 {answer}
 
-Scoring scale:
-- 1.0 = Every factual claim in the answer is directly supported by the context.
-- 0.7 = Most claims supported; minor unsupported details present.
-- 0.5 = About half the claims are supported; rest are inferred or generic.
-- 0.3 = Few claims supported; significant speculation or hallucination.
-- 0.0 = Answer contradicts the context or invents facts not present.
+Scoring rules:
+- 1.0 = Answer is relevant to the question AND incorporates the retrieved context.
+- 0.7 = Answer is relevant; uses most of the context with minor omissions.
+- 0.5 = Answer is relevant; uses some context OR correctly states what was found.
+- 0.3 = Answer is relevant but largely ignores available context, or contradicts it.
+- 0.0 = Answer is NOT relevant to the question (completely off-topic or wrong subject).
+
+Key notes:
+- Using model's own training knowledge is ACCEPTABLE and should NOT lower the score.
+- Only score 0.0 if the answer fails to address the question at all.
+- If context was retrieved, check whether the answer reflects it (higher = better use).
+- If no context was retrieved, score based purely on relevance to the question.
 
 Respond ONLY with a JSON object — no markdown, no extra text:
 {{"score": <float 0.0-1.0>, "reasoning": "<one concise sentence>"}}
@@ -73,7 +80,7 @@ class HallucinationDetector:
 
         context_text = "\n\n---\n\n".join(c.strip() for c in context[:5] if c.strip())
         if not context_text:
-            context_text = "(no documents retrieved — score based on answer plausibility only)"
+            context_text = "(no documents retrieved)"
 
         prompt = _JUDGE_PROMPT.format(
             question=question,

@@ -1,0 +1,1 @@
+{"query":{"term":{"source":"procurement"}},"_source":["title","source","entity_names","text"],"size":5}

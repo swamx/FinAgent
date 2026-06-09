@@ -70,6 +70,8 @@ class IngestionPipeline:
         chunks_indexed = 0
         pending_docs: list[dict] = []
 
+        pending_doc_ids: list[str] = []
+
         for doc in documents:
             doc_id = doc.get("document_id") or str(uuid.uuid4())
 
@@ -85,7 +87,7 @@ class IngestionPipeline:
                     "title": doc.get("title", ""),
                     "author": doc.get("author", ""),
                     "jurisdiction": doc.get("jurisdiction", ""),
-                    "date": doc.get("date", datetime.utcnow().strftime("%Y-%m-%d")),
+                    "date": doc.get("date") or datetime.utcnow().strftime("%Y-%m-%d"),
                     "doc_length": len(doc.get("text", "")),
                     "url": doc.get("url", ""),
                 },
@@ -96,16 +98,21 @@ class IngestionPipeline:
                 enriched["chunk_id"] = str(uuid.uuid4())
                 pending_docs.append(enriched)
 
-            self._mark_done(source_name, doc_id)
+            pending_doc_ids.append(doc_id)
 
             if len(pending_docs) >= self._embed_batch_size:
-                await self._flush(pending_docs)
-                chunks_indexed += len(pending_docs)
+                n = await self._flush(pending_docs)
+                chunks_indexed += n
                 pending_docs = []
+                for did in pending_doc_ids:
+                    self._mark_done(source_name, did)
+                pending_doc_ids = []
 
         if pending_docs:
-            await self._flush(pending_docs)
-            chunks_indexed += len(pending_docs)
+            n = await self._flush(pending_docs)
+            chunks_indexed += n
+            for did in pending_doc_ids:
+                self._mark_done(source_name, did)
 
         return chunks_indexed
 
@@ -113,33 +120,60 @@ class IngestionPipeline:
     # Internal
     # ------------------------------------------------------------------
 
-    async def _flush(self, docs: list[dict]) -> None:
+    async def _flush(self, docs: list[dict]) -> int:
+        """Embed and bulk-index docs. Returns count of successfully indexed chunks."""
+        import logging
+        _log = logging.getLogger(__name__)
         tracer = get_tracer()
         loop = asyncio.get_event_loop()
 
+        # Embed each chunk individually; skip failures rather than crashing.
+        embedded: list[tuple[dict, list[float]]] = []
         with tracer.start_as_current_span(
             "pipeline.embed_batch", attributes={"batch.size": len(docs)}
         ):
-            texts = [d["text"] for d in docs]
-            embeddings = await loop.run_in_executor(
-                None, lambda: [embed(t) for t in texts]
-            )
+            for doc in docs:
+                try:
+                    emb = await loop.run_in_executor(None, lambda d=doc: embed(d["text"]))
+                    embedded.append((doc, emb))
+                except Exception as exc:
+                    _log.warning("embed failed for chunk %s: %s", doc.get("chunk_id"), exc)
+
+        if not embedded:
+            return 0
 
         bulk_body: list[dict] = []
-        for doc, emb in zip(docs, embeddings):
+        for doc, emb in embedded:
             bulk_body.append({"index": {"_index": settings.opensearch_index, "_id": doc["chunk_id"]}})
             bulk_body.append({**doc, "embedding": emb})
 
-        if bulk_body:
-            with tracer.start_as_current_span(
-                "pipeline.bulk_index", attributes={"bulk.docs": len(docs)}
-            ):
-                _body = bulk_body  # capture for closure
+        with tracer.start_as_current_span(
+            "pipeline.bulk_index", attributes={"bulk.docs": len(embedded)}
+        ):
+            _body = bulk_body
 
-                async def _do_bulk():
-                    return await loop.run_in_executor(None, lambda: self.os.bulk(body=_body))
+            async def _do_bulk():
+                return await loop.run_in_executor(None, lambda: self.os.bulk(body=_body))
 
-                await opensearch_breaker.call_async(_do_bulk)
+            resp = await opensearch_breaker.call_async(_do_bulk)
+
+        if resp and resp.get("errors"):
+            failed = [
+                item["index"]
+                for item in resp.get("items", [])
+                if item.get("index", {}).get("status", 200) >= 400
+            ]
+            if failed:
+                _log.warning(
+                    "bulk index had %d failures (of %d): first=%s",
+                    len(failed), len(embedded), failed[0].get("error", {}).get("reason", "?")
+                )
+
+        indexed = sum(
+            1 for item in (resp.get("items", []) if resp else [])
+            if item.get("index", {}).get("status", 0) < 400
+        ) if resp else len(embedded)
+        return indexed
 
     def _is_done(self, source: str, doc_id: str) -> bool:
         return bool(self.redis.sismember(f"{_CHECKPOINT_KEY}:{source}", doc_id))

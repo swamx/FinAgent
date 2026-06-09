@@ -1,0 +1,1 @@
+{"query":{"term":{"source":"news"}},"_source":["title","source","doc_type","entity_names","text"],"size":5}

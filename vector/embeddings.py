@@ -14,9 +14,14 @@ _client = OpenAI(
 )
 
 
+_MAX_EMBED_CHARS = 6_000  # ~1500 tokens worst-case; nomic-embed-text ctx = 8192
+
+
 @traced("embed.create", model="nomic-embed-text")
 def embed(text: str) -> list[float]:
     t0 = time.time()
+    if len(text) > _MAX_EMBED_CHARS:
+        text = text[:_MAX_EMBED_CHARS]
     try:
         result = _client.embeddings.create(
             model=settings.embedding_model,

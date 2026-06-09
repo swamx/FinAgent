@@ -143,7 +143,7 @@
       retries: 15
       start_period: 30s
 
-  # ── OpenSanctions ingestion (run-once → Redis Graph) ─────────────────
+  # ── OpenSanctions default ingestion (run-once → RedisGraph 'entities') ─
   sanctions-ingestor:
     build:
       context: .
@@ -156,23 +156,55 @@
       REDIS_HOST: redis-stack
       REDIS_PORT: 6379
       BATCH_SIZE: 500
+      SANCTIONS_GRAPH: entities
     volumes:
       - sanctions_data:/data
       - /var/run/docker.sock:/var/run/docker.sock
     working_dir: /app/ingestion-pipelines/sanctions-pipeline
-    # Downloads the dataset then ingests it; exits when done.
     entrypoint:
       - /bin/sh
       - -c
       - |
         set -e
         python downloader.py
-        echo 'Ingesting into RedisGraph...'
+        echo 'Ingesting into RedisGraph (entities graph)...'
         python main.py /data/entities.ftm.json
         echo 'OpenSanctions ingestion complete.'
-        # --- Self Destruct ---
         echo 'Triggering background self-removal...'
         (sleep 20 && curl --unix-socket /var/run/docker.sock -X DELETE http://localhost/v1.41/containers/finagent-sanctions-ingestor?force=true) &
+    restart: "no"
+
+  # ── OpenSanctions KYB ingestion (run-once → RedisGraph 'kyb') ────────
+  # KYB dataset: ~102.9 M company/ownership entities (~4 GB download).
+  # Kept in a separate graph to avoid bloating the sanctions query path.
+  kyb-ingestor:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.worker
+    container_name: finagent-kyb-ingestor
+    depends_on:
+      redis-stack:
+        condition: service_healthy
+    environment:
+      REDIS_HOST: redis-stack
+      REDIS_PORT: 6379
+      BATCH_SIZE: 500
+      KYB_GRAPH: kyb
+    volumes:
+      - kyb_data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    working_dir: /app/ingestion-pipelines/kyb-pipeline
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        python downloader.py
+        echo 'Ingesting into RedisGraph (kyb graph)...'
+        python main.py /data/kyb_entities.ftm.json
+        echo 'KYB ingestion complete.'
+        echo 'Triggering background self-removal...'
+        (sleep 20 && curl --unix-socket /var/run/docker.sock -X DELETE http://localhost/v1.41/containers/finagent-kyb-ingestor?force=true) &
     restart: "no"
 
   # ── Document ingestion worker (5 sources → OpenSearch) ───────────────
@@ -327,5 +359,6 @@ volumes:
   litellm_data:
   postgres_data:
   sanctions_data:
+  kyb_data:
   icij_cache:
   grafana_data:

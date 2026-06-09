@@ -216,3 +216,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Prometheus / observability debug dumps (temp artifacts)
+prom_series.json
+C:*prom_series.json

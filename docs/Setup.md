@@ -1,5 +1,9 @@
 # FinAgent — Setup Guide
 
+**Navigation:** [README](../README.md) · [Architecture](Architecture.md) · [Links](Links.md) · [Demo](Demo.md)
+
+---
+
 ## Prerequisites
 
 | Requirement | Minimum | Notes |

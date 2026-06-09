@@ -1,5 +1,9 @@
 # FinAgent — Architecture
 
+**Navigation:** [README](../README.md) · [Setup](Setup.md) · [Agent Workflow](AgentWorkflowExplaination.md) · [Ingestion Architectures](IngestionFlow.md) · [Links](Links.md) · [Demo](Demo.md)
+
+---
+
 FinAgent is a containerized AML/PEP/sanctions compliance research platform. It ingests
 documents from five public data sources, builds a knowledge graph of entities and
 relationships, indexes document chunks into a vector store, and exposes a conversational
@@ -9,88 +13,9 @@ agent that answers compliance questions using hybrid semantic + graph retrieval.
 
 ## System Diagram
 
-```text
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              External Data Sources                          │
-│  SEC EDGAR   CourtListener   ICIJ Offshore Leaks   USASpending   GDELT News │
-└──────┬──────────────┬───────────────┬──────────────────┬──────────┬────────┘
-       │              │               │                  │          │
-       └──────────────┴───────────────┴──────────────────┴──────────┘
-                                      │
-                             ┌────────▼────────┐
-                             │  doc-ingestor   │  (one-shot worker)
-                             │  Dockerfile.worker
-                             └────────┬────────┘
-                                      │
-              ┌───────────────────────┼───────────────────────┐
-              │                       │                       │
-      ┌───────▼────────┐    ┌─────────▼──────────┐  ┌────────▼────────┐
-      │  spaCy + GLiNER│    │ LiteLLM Proxy :4000│  │  Chunker        │
-      │  Entity Extract│    │ (embed via Ollama) │  │  1200 chars     │
-      └───────┬────────┘    └─────────┬──────────┘  │  200 overlap    │
-              │                       │              └────────┬────────┘
-              │              ┌────────▼────────┐             │
-              │              │  Embeddings     │             │
-              │              │  nomic-embed    │             │
-              │              │  768-dim        │             │
-              └──────────────┴────────┬────────┴─────────────┘
-                                      │
-                    ┌─────────────────┴─────────────────┐
-                    │                                   │
-           ┌────────▼────────┐                ┌────────▼────────┐
-           │    FalkorDB     │                │   OpenSearch    │
-           │  Graph :6379    │                │  Vector :9200   │
-           │  "entities"     │                │  "fintech-docs" │
-           │  Nodes + Edges  │                │  KNN HNSW/nmslib│
-           └────────┬────────┘                └────────┬────────┘
-                    │                                   │
-                    └─────────────────┬─────────────────┘
-                                      │
-                             ┌────────▼──────────┐
-                             │   FastAPI :8000   │
-                             │  slowapi limiter  │
-                             │  /chat  10/min   │
-                             │  /search 60/min  │
-                             │  /entity/{id}    │
-                             └────────┬──────────┘
-                                      │
-                             ┌────────▼────────┐
-                             │ PydanticAI Agent│
-                             │  0.4.2          │
-                             │  request_limit=8│
-                             │  4 tools:        │
-                             │  search_docs     │
-                             │  get_entity      │
-                             │  get_exposure    │
-                             │  expand_entity   │
-                             └────────┬────────┘
-                                      │
-                             ┌────────▼────────┐
-                             │ LiteLLM :4000   │
-                             │ qwen3:4b        │◄── Ollama :11434
-                             │ + optional cloud│◄── Anthropic / etc.
-                             └────────┬────────┘
-                                      │
-                    ┌─────────────────┴─────────────────┐
-                    │                                   │
-           ┌────────▼────────┐                ┌────────▼────────┐
-           │  Open WebUI     │                │  OpenSearch     │
-           │  Chat UI :3001  │                │  Dashboards     │
-           │                 │                │  :5601          │
-           └─────────────────┘                └─────────────────┘
+See the interactive diagram in [AgentWorkflowExplaination.md](AgentWorkflowExplaination.md) (Mermaid, renders on GitHub) or the static export:
 
-           ┌──────────────────────────────────────────────────┐
-           │  grafana/otel-lgtm :3100 / :4317                 │
-           │  Grafana · Prometheus · Loki · Tempo             │
-           │  4 pre-provisioned dashboards (no login)         │
-           └──────────────────────────────────────────────────┘
-
-                    ┌─────────────────────────────────┐
-                    │  sanctions-ingestor (one-shot)   │
-                    │  OpenSanctions JSONL (~2 GB)     │
-                    │  → FalkorDB graph "entities"     │
-                    └─────────────────────────────────┘
-```
+![Service & Agent Workflow](workflow_td.png)
 
 ---
 
@@ -163,6 +88,8 @@ Dashboards UI: <http://localhost:5601>
 
 ## Ingestion Pipeline
 
+Full pipeline diagrams — current architecture and four alternatives (Kafka+Spark, Kafka+Flink, Kafka+Knative, AWS Lambda+SQS) — are in [IngestionFlow.md](IngestionFlow.md).
+
 ### Sanctions Graph (one-shot)
 
 ```text
@@ -177,39 +104,22 @@ Container self-destructs after completion.
 
 ### Document Ingestion (idempotent, periodic refresh)
 
-Five sources run in parallel via `asyncio.gather`:
-
 ```text
-SEC EDGAR          10-K/10-Q/8-K, AML search terms, 180 days back
-                   emits: author (company), jurisdiction="US", url
-CourtListener      court opinions, optional auth token
-                   emits: title (case_name), author+jurisdiction (court_id)
-ICIJ Offshore Leaks  Panama + Paradise + Pandora Papers CSV bulk
-                   emits: author (sourceID), jurisdiction (countries CSV)
-USASpending.gov    contracts, compliance keywords
-                   emits: author (agency name), jurisdiction (state or "US")
-GDELT Doc 2.0      news, AML/sanctions queries
-                   emits: author (domain), jurisdiction (country), url
-    │
-    ▼
-chunk_text()       1200-char sentence-boundary chunks, 200 char overlap
-    │
-    ▼
-HybridEntityExtractor   spaCy (7 labels) + GLiNER (8 financial labels)
-                        GLiNER preferred on overlap, 0.45 confidence threshold
-    │
-    ▼
-EntityEnricher     exact-match → fuzzy (RapidFuzz 80%) → create new node
-                   annotates chunk with entity_ids + mention char spans
-    │
-    ▼
-embed()            nomic-embed-text via LiteLLM proxy
-    │
-    ▼
-OpenSearch bulk    HNSW KNN + BM25 text fields + all metadata
-    │
-    ▼
-ProfileBuilder     synthetic entity + exposure profile docs
+Multiple Sources (SEC EDGAR · CourtListener · ICIJ · USASpending · GDELT News)
+  ↓  asyncio.gather — parallel fetch
+chunk_text()           1200-char sentence-boundary chunks, 200 char overlap
+  ↓
+HybridEntityExtractor  spaCy (7 labels) + GLiNER (8 financial labels)
+                       GLiNER preferred on overlap, 0.45 confidence threshold
+  ↓
+EntityEnricher         exact-match → fuzzy (RapidFuzz 80%) → create new node
+                       annotates chunk with entity_ids + mention char spans
+  ↓
+embed()                nomic-embed-text via LiteLLM proxy
+  ↓
+OpenSearch bulk        HNSW KNN + BM25 text fields + all metadata
+  ↓
+ProfileBuilder         synthetic entity + exposure profile docs
 ```
 
 Redis checkpointing (`SADD fintech:ingested:{source}`) makes re-runs idempotent.
@@ -439,3 +349,7 @@ RAGAS and its LangChain dependency are kept in `requirements-eval.txt` and
 `Dockerfile.eval` so the production API image stays lean. The eval runner calls
 the live `/chat` and `/search` endpoints over the Docker network, testing the
 real stack rather than mocked components.
+
+---
+
+**Navigation:** [README](../README.md) · [Setup](Setup.md) · [Agent Workflow](AgentWorkflowExplaination.md) · [Ingestion Architectures](IngestionFlow.md) · [Links](Links.md) · [Demo](Demo.md)

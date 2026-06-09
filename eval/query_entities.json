@@ -1,0 +1,1 @@
+{"query":{"term":{"source":"graph_profile"}},"_source":["title","source","doc_type","entity_names","entity_ids","text"],"size":10}

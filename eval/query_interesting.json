@@ -1,0 +1,1 @@
+{"query":{"bool":{"must":[{"term":{"source":"graph_profile"}},{"bool":{"should":[{"match":{"text":"OFAC"}},{"match":{"text":"sanctions"}},{"match":{"text":"PEP"}},{"match":{"text":"Panama"}},{"match":{"text":"person"}}]}}],"filter":[{"term":{"doc_type":"entity_profile"}}]}},"_source":["title","source","doc_type","entity_ids","entity_names","text"],"size":20}

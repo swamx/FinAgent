@@ -4,6 +4,7 @@ import spacy
 from rapidfuzz import fuzz, process
 from redis import Redis
 
+from core.config import settings
 from core.models import Entity
 
 
@@ -11,11 +12,11 @@ class EntityResolver:
     # NER labels we care about for compliance
     _LABELS = {"PERSON", "ORG", "GPE", "FAC"}
 
-    def __init__(self, redis_client: Redis):
+    def __init__(self, redis_client: Redis, graphs: list[str] | None = None):
         self.redis = redis_client
-        self._graph = "entities"
+        self._graphs = graphs or [settings.sanctions_graph, settings.kyb_graph]
         self._nlp = spacy.load("en_core_web_sm")
-        # populated lazily — avoids a full-scan on startup
+        # name → entity_id; populated lazily from all graphs
         self._name_index: dict[str, str] = {}
 
     # ------------------------------------------------------------------
@@ -42,6 +43,19 @@ class EntityResolver:
                 seen.add(entity.id)
         return resolved
 
+    def warm_cache(self, sample_size: int = 50_000) -> None:
+        """Pre-populate the fuzzy name index from all graphs."""
+        query = f"MATCH (e:Entity) RETURN e.id, e.name LIMIT {sample_size}"
+        for graph in self._graphs:
+            try:
+                result = self.redis.execute_command("GRAPH.QUERY", graph, query)
+                if len(result) > 1:
+                    for row in result[1]:
+                        if row[0] and row[1]:
+                            self._name_index[row[1].lower()] = row[0]
+            except Exception:
+                pass
+
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
@@ -52,10 +66,14 @@ class EntityResolver:
             f"MATCH (e) WHERE toLower(e.name) = toLower('{safe}') "
             "RETURN e.id, e.name LIMIT 1"
         )
-        result = self.redis.execute_command("GRAPH.QUERY", self._graph, query)
-        if len(result) > 1 and result[1]:
-            row = result[1][0]
-            return Entity(id=row[0], name=row[1])
+        for graph in self._graphs:
+            try:
+                result = self.redis.execute_command("GRAPH.QUERY", graph, query)
+                if len(result) > 1 and result[1]:
+                    row = result[1][0]
+                    return Entity(id=row[0], name=row[1])
+            except Exception:
+                pass
         return None
 
     def _fuzzy_lookup(self, mention: str, threshold: int = 85) -> Entity | None:

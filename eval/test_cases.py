@@ -1,8 +1,13 @@
 """Curated evaluation test cases for FinAgent compliance queries.
 
+All questions are grounded in data actually present in the index:
+  - graph_profile: OpenSanctions / WikiData entity profiles
+  - news: Panama Papers, offshore wealth, OFAC/BIS, Treasury 2026
+  - procurement: US federal contract awards (VA, DFC, CFTC, etc.)
+
 Each case has:
   question   — the compliance query sent to the agent
-  reference  — optional ground-truth (used by RAGAS ContextRecall / Precision)
+  reference  — ground-truth text used by RAGAS ContextRecall / Precision
   tags       — topic labels for filtering eval runs
 """
 from __future__ import annotations
@@ -18,239 +23,271 @@ class EvalCase:
 
 
 EVAL_CASES: list[EvalCase] = [
-    # ── Sanctions ─────────────────────────────────────────────────────────
+
+    # ── Graph / OpenSanctions — person entities ────────────────────────────
+
     EvalCase(
-        question="Is Roman Abramovich subject to any international sanctions? Which jurisdictions?",
+        question="Is KHAVA EFENDIEVA on the Interpol red notices list and does she appear on any European sanctions list?",
         reference=(
-            "Roman Abramovich is sanctioned by the UK (OFSI), EU, and other Western "
-            "jurisdictions following the 2022 Russia-Ukraine conflict, with asset freezes "
-            "and travel bans."
+            "KHAVA EFENDIEVA appears in two datasets: interpol_red_notices and "
+            "be_fod_sanctions (Belgian Federal Public Service sanctions). "
+            "Her PEP/Sanctions flag is YES."
         ),
-        tags=["sanctions", "russia"],
+        tags=["graph", "opensanctions", "interpol", "sanctions"],
     ),
     EvalCase(
-        question="What is Oleg Deripaska's sanctions status and what companies is he associated with?",
-        tags=["sanctions", "russia", "graph"],
-    ),
-    EvalCase(
-        question="List the primary relationship types used to connect sanctioned Russian entities in the dataset.",
-        tags=["sanctions", "graph", "schema"],
-    ),
-    EvalCase(
-        question="Which entities from North Korea appear in the OpenSanctions dataset?",
-        tags=["sanctions", "north_korea"],
-    ),
-    # ── PEP / AML ─────────────────────────────────────────────────────────
-    EvalCase(
-        question=(
-            "What are the defining characteristics of a politically exposed person (PEP) "
-            "and what AML risks do they present?"
-        ),
+        question="Which sanctions lists include Vitaly KULIKOV, and what is his PEP/sanctions flag?",
         reference=(
-            "PEPs are individuals holding or having held prominent public positions. "
-            "Risks include bribery, corruption, and laundering of misappropriated public funds. "
-            "Enhanced due diligence is required under FATF guidance."
+            "Vitaly KULIKOV is listed in be_fod_sanctions, fr_tresor_gels_avoir, "
+            "mc_fund_freezes, eu_fsf, and eu_journal_sanctions. "
+            "His PEP/Sanctions flag is YES."
         ),
-        tags=["pep", "aml"],
+        tags=["graph", "opensanctions", "sanctions", "eu"],
     ),
     EvalCase(
-        question=(
-            "How should a compliance officer handle a payment from a PEP in a "
-            "high-risk jurisdiction according to FATF guidelines?"
-        ),
-        tags=["pep", "aml", "compliance"],
-    ),
-    EvalCase(
-        question="What is the difference between a domestic PEP and a foreign PEP for AML purposes?",
-        tags=["pep", "aml"],
-    ),
-    # ── Offshore / ICIJ ───────────────────────────────────────────────────
-    EvalCase(
-        question="What types of offshore structures appear most frequently in the Panama Papers data?",
-        tags=["icij", "offshore"],
-    ),
-    EvalCase(
-        question=(
-            "Which jurisdictions are most commonly used for shell company formation "
-            "according to the ICIJ Offshore Leaks database?"
-        ),
-        tags=["icij", "offshore"],
-    ),
-    # ── SEC ───────────────────────────────────────────────────────────────
-    EvalCase(
-        question="Summarise recent SEC enforcement actions related to OFAC sanctions violations.",
-        tags=["sec", "ofac", "enforcement"],
-    ),
-    EvalCase(
-        question=(
-            "What disclosures have public companies made regarding beneficial ownership "
-            "risk in recent 10-K filings?"
-        ),
-        tags=["sec", "beneficial_ownership"],
-    ),
-    # ── Court ─────────────────────────────────────────────────────────────
-    EvalCase(
-        question="What legal precedents exist in US courts for prosecuting trade-based money laundering?",
-        tags=["court", "aml", "tbml"],
-    ),
-    EvalCase(
-        question=(
-            "Describe the elements prosecutors must prove in a wire fraud case involving "
-            "offshore accounts, citing relevant case law."
-        ),
-        tags=["court", "wire_fraud"],
-    ),
-    # ── Procurement ───────────────────────────────────────────────────────
-    EvalCase(
-        question=(
-            "Which federal agencies have awarded the largest cybersecurity intelligence "
-            "contracts, and to whom?"
-        ),
-        tags=["procurement", "cybersecurity"],
-    ),
-    # ── Cross-database (require retrieval across multiple sources) ───────────
-    # Sanctions ↔ ICIJ
-    EvalCase(
-        question=(
-            "Does Roman Abramovich appear in any ICIJ offshore leak dataset (Panama Papers, "
-            "Offshore Leaks, Pandora Papers)? If so, in which jurisdictions were his offshore "
-            "structures registered?"
-        ),
+        question="Is Jian Xia on the Dutch most-wanted list? What other law enforcement databases include this person?",
         reference=(
-            "Roman Abramovich appears in ICIJ offshore leak records with structures in "
-            "British Virgin Islands and other secrecy jurisdictions, in addition to being "
-            "subject to UK, EU and allied sanctions."
+            "Jian Xia is listed in both interpol_red_notices and nl_most_wanted "
+            "(Dutch most wanted). The PEP/Sanctions flag is NO."
         ),
-        tags=["cross_db", "sanctions", "icij", "russia"],
+        tags=["graph", "opensanctions", "interpol", "law_enforcement"],
     ),
     EvalCase(
-        question=(
-            "Which individuals listed in the OpenSanctions dataset also appear in the "
-            "Panama Papers or Pandora Papers? Name at least two and describe their offshore "
-            "structures."
+        question="What dataset lists SANAVBARI NIKITENKO and what is their entity type?",
+        reference=(
+            "SANAVBARI NIKITENKO is a Person listed in the interpol_red_notices dataset. "
+            "Their PEP/Sanctions flag is NO."
         ),
-        tags=["cross_db", "sanctions", "icij", "offshore"],
+        tags=["graph", "opensanctions", "interpol"],
     ),
     EvalCase(
-        question=(
-            "Identify sanctioned North Korean entities that also appear in ICIJ offshore "
-            "leak records and describe the shell-company structures used."
+        question="Is DZHAMBULAT GALIMOV listed on any Interpol database?",
+        reference=(
+            "DZHAMBULAT GALIMOV is a Person listed in the interpol_red_notices dataset."
         ),
-        tags=["cross_db", "sanctions", "icij", "north_korea"],
-    ),
-    # Sanctions ↔ SEC
-    EvalCase(
-        question=(
-            "Which public companies have disclosed material OFAC sanctions risk in SEC 10-K "
-            "filings while simultaneously having a named officer or director appearing in the "
-            "OpenSanctions dataset?"
-        ),
-        tags=["cross_db", "sanctions", "sec", "beneficial_ownership"],
+        tags=["graph", "opensanctions", "interpol"],
     ),
     EvalCase(
-        question=(
-            "Summarise SEC enforcement actions against firms whose sanctioned counterparties "
-            "also appear in the OpenSanctions database. What penalties were imposed?"
+        question="What is Eduardo GONZALEZ QUIRARTE's entity type and which datasets list this individual?",
+        reference=(
+            "Eduardo GONZALEZ QUIRARTE is a Person. "
+            "Datasets include us_sam_exclusions, us_trade_csl, and us_ofac_sdn."
         ),
-        tags=["cross_db", "sanctions", "sec", "enforcement"],
-    ),
-    # Sanctions ↔ Court
-    EvalCase(
-        question=(
-            "Are there US federal court cases where a defendant is also listed on the OFAC "
-            "SDN list or the EU consolidated sanctions list? Provide case names and charges."
-        ),
-        tags=["cross_db", "sanctions", "court"],
+        tags=["graph", "opensanctions", "ofac", "us_sanctions"],
     ),
     EvalCase(
-        question=(
-            "What criminal charges have been brought against Oleg Deripaska or his associated "
-            "companies in US courts, and how do those charges relate to his OFAC sanctions "
-            "designation?"
+        question="Is Khalid SBAA flagged in any European sanctions database?",
+        reference=(
+            "Khalid SBAA is a Person listed in be_fod_sanctions (Belgian sanctions). "
+            "PEP/Sanctions flag is YES."
         ),
-        tags=["cross_db", "sanctions", "court", "russia"],
-    ),
-    # ICIJ ↔ Court
-    EvalCase(
-        question=(
-            "Which shell companies registered in the British Virgin Islands and documented in "
-            "ICIJ offshore leak data have also appeared as defendants or subjects in US federal "
-            "court proceedings?"
-        ),
-        tags=["cross_db", "icij", "court", "offshore"],
+        tags=["graph", "opensanctions", "sanctions", "eu"],
     ),
     EvalCase(
-        question=(
-            "Describe US court cases that cited Panama Papers evidence. What offences were "
-            "charged and what was the outcome?"
+        question="What entity type is MANDALA and which sanctions regime has designated it?",
+        reference=(
+            "MANDALA is a Vessel listed in ua_war_sanctions (Ukrainian war sanctions) "
+            "and gb_fcdo_sanctions. Its PEP/Sanctions flag is YES."
         ),
-        tags=["cross_db", "icij", "court"],
+        tags=["graph", "opensanctions", "vessel", "war_sanctions"],
     ),
-    # PEP ↔ Sanctions ↔ ICIJ (triple cross)
+
+    # ── Graph / OpenSanctions — company entities ───────────────────────────
+
     EvalCase(
-        question=(
-            "Identify politically exposed persons (PEPs) who appear in both an international "
-            "sanctions list and an ICIJ offshore leak dataset. What AML red flags does the "
-            "combination present?"
+        question="What type of entity is Myanmar Yatai International Holding Group Co., Ltd. and which US sanctions lists include it?",
+        reference=(
+            "Myanmar Yatai International Holding Group Co., Ltd. is a Company. "
+            "It appears in us_sam_exclusions, ext_us_ofac_press_releases, us_ofac_sdn, "
+            "opencorporates, and us_trade_csl. PEP/Sanctions flag is NO."
         ),
-        tags=["cross_db", "pep", "sanctions", "icij", "aml"],
-    ),
-    # PEP ↔ SEC
-    EvalCase(
-        question=(
-            "Have any SEC-registered public companies disclosed business relationships with "
-            "politically exposed persons (PEPs) in recent proxy statements or 10-K risk "
-            "factors? What enhanced due-diligence steps did they describe?"
-        ),
-        tags=["cross_db", "pep", "sec", "aml"],
-    ),
-    # Procurement ↔ Sanctions
-    EvalCase(
-        question=(
-            "Are any companies that received US federal procurement contracts in the last "
-            "three years also listed in international sanctions databases? Name the companies "
-            "and the sanctioning authority."
-        ),
-        tags=["cross_db", "procurement", "sanctions"],
+        tags=["graph", "opensanctions", "ofac", "myanmar"],
     ),
     EvalCase(
-        question=(
-            "Which US government contractors awarded cybersecurity or intelligence contracts "
-            "have subsidiaries or beneficial owners that appear in OFAC or EU sanctions lists?"
+        question="Is Limited Liability Company Rustmash listed under US OFAC sanctions and Ukrainian war sanctions?",
+        reference=(
+            "Limited Liability Company Rustmash is a Company listed in "
+            "us_sam_exclusions, ua_war_sanctions, ext_us_ofac_press_releases, "
+            "us_ofac_sdn, and us_trade_csl. PEP/Sanctions flag is YES."
         ),
-        tags=["cross_db", "procurement", "sanctions", "cybersecurity"],
+        tags=["graph", "opensanctions", "ofac", "war_sanctions"],
     ),
-    # SEC ↔ Court
     EvalCase(
-        question=(
-            "Which SEC enforcement actions for OFAC violations have also led to parallel "
-            "criminal indictments in US federal courts? Compare the civil and criminal "
-            "outcomes."
+        question="Which datasets include MARJAN METHANOL COMPANY and what is its entity type?",
+        reference=(
+            "MARJAN METHANOL COMPANY is a Company listed in permid, "
+            "us_sam_exclusions, us_trade_csl, and us_ofac_sdn."
         ),
-        tags=["cross_db", "sec", "court", "ofac", "enforcement"],
+        tags=["graph", "opensanctions", "ofac", "iran"],
     ),
-    # Beneficial-ownership chain (multi-source)
+
+    # ── News / Panama Papers / Offshore ───────────────────────────────────
+
     EvalCase(
-        question=(
-            "Trace the full beneficial ownership chain of a company that appears in both "
-            "ICIJ offshore leak data and a US SEC filing. Identify any links to sanctioned "
-            "individuals or entities at any layer of the chain."
+        question="How did the Panama Papers revelations affect Nigeria's transparency laws and regulatory policies?",
+        reference=(
+            "The Panama Papers rewrote Nigeria's transparency law and sparked "
+            "regulatory policies focused on beneficial ownership and shell company "
+            "disclosure, requiring stronger anti-money-laundering measures."
         ),
-        tags=["cross_db", "icij", "sec", "sanctions", "beneficial_ownership", "graph"],
+        tags=["news", "panama_papers", "beneficial_ownership", "nigeria"],
     ),
-    # ── Hallucination traps (no relevant data expected in corpus) ─────────
     EvalCase(
-        question="What is Apple's current stock price?",
+        question="What did the Treasury 2026 National Risk Assessments signal about beneficial ownership exposure?",
+        reference=(
+            "The Treasury 2026 National Risk Assessments signal expanding exposure "
+            "related to beneficial ownership and shell company risks."
+        ),
+        tags=["news", "treasury", "beneficial_ownership", "risk"],
+    ),
+    EvalCase(
+        question="What are the legal risks for a person reporting OFAC or BIS violations — are they a whistleblower, witness, or confidential source?",
+        reference=(
+            "A reporting person may be classified as a whistleblower (with statutory "
+            "protections), witness, or confidential source, each carrying different "
+            "legal risks and protections under OFAC and BIS violation frameworks."
+        ),
+        tags=["news", "ofac", "bis", "whistleblower", "compliance"],
+    ),
+    EvalCase(
+        question="According to recent investigations, how many Nigerian politicians have hidden assets in Dubai and what is the estimated value?",
+        reference=(
+            "Over 200 Nigerian politicians, governors, senators, security chiefs, "
+            "and other politically connected individuals have stashed at least $7 billion "
+            "in Dubai properties across at least 1,824 traced assets."
+        ),
+        tags=["news", "pep", "offshore", "nigeria"],
+    ),
+    EvalCase(
+        question="What has academic research said about the silence surrounding offshore wealth?",
+        reference=(
+            "Academic discourse has highlighted a deafening silence around offshore "
+            "wealth, with opinion pieces from sources including The Jakarta Post and "
+            "Bangkok Post pointing to the lack of transparency around hidden offshore assets."
+        ),
+        tags=["news", "offshore", "academic"],
+    ),
+    EvalCase(
+        question="Ten years after the Panama Papers, what progress has been made in pursuing tax justice?",
+        reference=(
+            "A decade after the Panama Papers, enablers and tax cheats continue to be "
+            "brought to justice. The long pursuit of tax justice continues, with "
+            "investigations and prosecutions still ongoing globally."
+        ),
+        tags=["news", "panama_papers", "tax_justice"],
+    ),
+    EvalCase(
+        question="What was a notable pump and dump scheme case involving British Columbia residents?",
+        reference=(
+            "Four British Columbia residents were fined millions for a pump and dump "
+            "scheme by a Quebec tribunal."
+        ),
+        tags=["news", "fraud", "enforcement"],
+    ),
+    EvalCase(
+        question="What is Beijing's new red line regarding offshore firms and China operations?",
+        reference=(
+            "Beijing's new red line restricts offshore firms from fully de-listing "
+            "or separating from China, signalling new compliance exposure for companies "
+            "using offshore structures to distance themselves from Chinese operations."
+        ),
+        tags=["news", "offshore", "china", "compliance"],
+    ),
+
+    # ── Procurement ────────────────────────────────────────────────────────
+
+    EvalCase(
+        question="What was the value and purpose of the SAIC contract awarded by the Department of Veterans Affairs under the T4NG vehicle?",
+        reference=(
+            "Science Applications International Corporation (SAIC) received a contract "
+            "valued at $141,683,156 USD from the Department of Veterans Affairs under "
+            "the T4NG (Transformation Twenty-One Total Technology Next Generation) vehicle, "
+            "to provide on-site professional and technical IT support services for the "
+            "VA Financial Services Center (FSC)."
+        ),
+        tags=["procurement", "va", "saic", "t4ng"],
+    ),
+    EvalCase(
+        question="What services did PRO-SPHERE TEK, INC. provide under its VA contract and what was the contract value?",
+        reference=(
+            "PRO-SPHERE TEK, INC. received a T&M task order valued at $6,104,627 USD "
+            "from the Department of Veterans Affairs to provide continued professional "
+            "and IT services supporting the VA FSC Financial Technology Service, "
+            "including IT infrastructure operations, software projects, and deliverables "
+            "aligned with the Veterans-Focused Integration Process (VIP)."
+        ),
+        tags=["procurement", "va", "it_services"],
+    ),
+    EvalCase(
+        question="What did ECONOMETRICA, INC. perform for the Export-Import Bank of the United States?",
+        reference=(
+            "ECONOMETRICA, INC. received a contract valued at $437,112 USD from the "
+            "Export-Import Bank of the United States for financial technology (fintech) analysis."
+        ),
+        tags=["procurement", "exim_bank", "fintech"],
+    ),
+    EvalCase(
+        question="What is the purpose of the METGREEN SOLUTIONS INC contract with the Department of Veterans Affairs?",
+        reference=(
+            "METGREEN SOLUTIONS INC received a $403,480 USD contract from the "
+            "Department of Veterans Affairs to replace the end-of-lifecycle IBM FileNet "
+            "P8 platform software for the VA Financial Technology Service Program Management Office."
+        ),
+        tags=["procurement", "va", "it_infrastructure"],
+    ),
+    EvalCase(
+        question="Which two consulting firms received contracts from the DFC for the Uzbekistan fintech Project Nomad, and what were the contract values?",
+        reference=(
+            "Boston Consulting Group received $350,000 USD for commercial due diligence, "
+            "and KPMG LLP received $142,589 USD for financial due diligence, both from "
+            "the U.S. International Development Finance Corporation (DFC) for "
+            "Project Nomad — Uzbekistan Financial Technology."
+        ),
+        tags=["procurement", "dfc", "uzbekistan", "fintech"],
+    ),
+    EvalCase(
+        question="What data subscriptions has Clarus Financial Technology provided to the Commodity Futures Trading Commission?",
+        reference=(
+            "Clarus Financial Technology has provided multiple data subscriptions to "
+            "the CFTC including SDR View, SEF View, CCP View license renewals, "
+            "Clarus Swaps Databases, and site licenses for financial data services."
+        ),
+        tags=["procurement", "cftc", "clarus", "derivatives"],
+    ),
+    EvalCase(
+        question="What optional task areas did the SAIC T4NG VA contract include beyond core IT support?",
+        reference=(
+            "The SAIC T4NG contract included optional tasks for privacy services, "
+            "cloud services (Cloud Center of Excellence), and one 45-day phase-out "
+            "transition task. The total task order period shall not exceed 60 months."
+        ),
+        tags=["procurement", "va", "saic", "cloud"],
+    ),
+
+    # ── Hallucination traps (no relevant data in corpus) ──────────────────
+
+    EvalCase(
+        question="What is Apple Inc.'s current stock price and market capitalisation?",
         reference="",
         tags=["hallucination_trap"],
     ),
     EvalCase(
-        question="Describe FinAgent's internal database schema in detail.",
+        question="Who is the current CEO of Google and when did they take over?",
         reference="",
         tags=["hallucination_trap"],
     ),
     EvalCase(
-        question="Who won the most recent FIFA World Cup?",
+        question="Describe FinAgent's internal database schema and table structure in detail.",
+        reference="",
+        tags=["hallucination_trap"],
+    ),
+    EvalCase(
+        question="Who won the most recent FIFA World Cup and in which country was it held?",
+        reference="",
+        tags=["hallucination_trap"],
+    ),
+    EvalCase(
+        question="What is the current interest rate set by the US Federal Reserve?",
         reference="",
         tags=["hallucination_trap"],
     ),

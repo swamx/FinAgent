@@ -58,19 +58,62 @@ class RetrievalService:
             with tracer.start_as_current_span("retrieval.embed"):
                 embedding = embed(query)
 
+            # ── 3b. Raw NER mentions (for name-text fallback) ────────────
+            mentions = self.resolver.extract_mentions(query)
+
             # ── 4. Vector search (hybrid BM25+kNN when entities found) ───
             with tracer.start_as_current_span("retrieval.vector_search") as v_span:
                 if related_ids:
-                    docs = self.vector.search_hybrid(
+                    # Fetch entity profile docs first (deterministic, no kNN drift)
+                    profile_docs = self.vector.get_entity_profiles(
+                        [e.id for e in entities], k=len(entities) * 2
+                    )
+
+                    # Hybrid entity-filtered search for linked documents
+                    entity_docs = self.vector.search_hybrid(
                         entity_ids=related_ids,
                         embedding=embedding,
                         query_text=query,
                         k=limit,
                     )
+
+                    # Unrestricted kNN — catches procurement/news not linked to entities
+                    fallback_docs = self.vector.search(embedding, k=limit)
+
+                    # Merge: profile docs first, then entity-filtered, then fallback
+                    seen_ids: set[str] = set()
+                    docs: list = []
+                    for d in profile_docs + entity_docs + fallback_docs:
+                        if d.id not in seen_ids:
+                            seen_ids.add(d.id)
+                            docs.append(d)
+                    docs = docs[:limit]
                     v_span.set_attribute("retrieval.mode", "hybrid_entity_filtered")
                 else:
-                    docs = self.vector.search(embedding, k=limit)
-                    v_span.set_attribute("retrieval.mode", "knn_fallback")
+                    # No graph match — kNN is the primary retriever.
+                    # Entity-name BM25 search supplements (appended after kNN)
+                    # so procurement/news docs are never displaced by entity profiles.
+                    knn_docs = self.vector.search(embedding, k=limit)
+                    seen_ids: set[str] = set()
+                    docs = []
+                    for d in knn_docs:
+                        if d.id not in seen_ids:
+                            seen_ids.add(d.id)
+                            docs.append(d)
+                    # Append name-matched entity profiles as bonus (cap at 3)
+                    if mentions:
+                        name_docs = self.vector.search_by_entity_names(
+                            mentions, k=3
+                        )
+                        for d in name_docs:
+                            if d.id not in seen_ids:
+                                seen_ids.add(d.id)
+                                docs.append(d)
+                    else:
+                        name_docs = []
+                    docs = docs[:limit + 3]  # allow bonus name profiles
+                    mode = "knn+name_supplement" if name_docs else "knn_fallback"
+                    v_span.set_attribute("retrieval.mode", mode)
                 v_span.set_attribute("retrieval.docs_returned", len(docs))
 
             n_docs = len(docs)

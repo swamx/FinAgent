@@ -23,7 +23,7 @@ SMALL = IngestMode(
     icij_max_docs=3_000,
     procurement_max_docs=500,
     news_max_docs=500,
-    news_full_text=False,
+    news_full_text=True,
     embed_batch_size=128,
     max_concurrent=32,
 )
